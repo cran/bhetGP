@@ -1,7 +1,7 @@
 Package: bhetGP
 Type: Package
 Title: Bayesian Heteroskedastic Gaussian Processes
-Version: 1.0
+Version: 1.0.1
 Authors@R: person(given = c("Parul", "V."),
                   family = "Patil",
                   role = c("aut", "cre"),
@@ -25,7 +25,7 @@ Imports: grDevices, graphics, stats, doParallel, foreach, parallel,
 LinkingTo: Rcpp, RcppArmadillo
 Suggests: interp
 RoxygenNote: 7.3.2
-Packaged: 2025-07-09 17:09:04 UTC; parulvijay
+Packaged: 2025-07-18 19:47:40 UTC; parulvijay
 Author: Parul V. Patil [aut, cre]
 Repository: CRAN
-Date/Publication: 2025-07-14 17:20:10 UTC
+Date/Publication: 2025-07-18 22:50:02 UTC

@@ -124,10 +124,9 @@
 #'        to rows of \code{x}, defaults to random, is applied to \code{x} (only used if 
 #'        \code{vecchia = TRUE})
 #' @param verb logical indicating whether to print progress
-#' @param cores logical; if \code{vecchia = TRUE}, user may specify the number of cores to
-#'        use for OpenMP parallelization.  Defaults to \code{min(2, maxcores - 1)} 
-#'        where \code{maxcores} is the number of detectable available cores.
-#' 
+#' @param omp_cores logical; if \code{vecchia = TRUE}, user may specify the number of cores to
+#'        use for OpenMP parallelization. Uses min(4, limit) where limit is max openMP 
+#'        cores available on the machine.
 #' @return a list of the S3 class \code{bhetgp} or \code{bhetgp_vec} with elements:
 #' \itemize{
 #'   \item \code{x}: copy of input matrix
@@ -170,20 +169,22 @@
 #' Sauer, Annie Elizabeth. "Deep Gaussian process surrogates for computer experiments." (2023).
 #' 
 #' @examples 
-#' #' @examples 
-#' # Additional examples including real-world computer experiments are available at: 
-#' # https://bitbucket.org/gramacylab/bhgp/src/main/examples
 #' 
+#' # 1D function with 1D noise 
+#' 
+#' # Truth
 #' fx <- function(x){
 #' result <- (6 * x - 2)^2* sin(12 * x - 4)
 #' }
+#' 
+#' # Noise
 #' rx <- function(x){
 #' result <- (1.1 + sin(2 * pi * x))^2
 #' return(result)
 #' }
 #' 
 #' # Training data
-#' r <- 10
+#' r <- 10 # replicates
 #' xn <- seq(0, 1, length = 25)
 #' x <- rep(xn, r)
 #' 
@@ -197,30 +198,61 @@
 #' xx <- seq(0, 1, length = 100)
 #' yy <- fx(xx)
 #' 
-#' # Example 1: Full model, no Vecchia
-#' fit <- bhetGP(x, y, nmcmc = 100)
+#' #--------------------------------------------------------------------------- 
+#' # Example 1: Full model, no Vecchia 
+#' #---------------------------------------------------------------------------
+#' 
+#' # Fitting a bhetGP model using all the data
+#' fit <- bhetGP(x, y, nmcmc = 100, verb = FALSE)
+#' 
+#' # Trimming the object to remove burn in and thin samples
 #' fit <- trim(fit, 50, 10)
-#' fit <- predict(fit, xx, cores = 2)
-#' plot(fit) # can run with trace = TRUE to view trace plots
+#' 
+#' # Predition using the bhetGP object (indepedent predictions)
+#' fit <- predict(fit, xx, cores = 2) 
+#' 
+#' # Visualizing the mean predictive surface. 
+#' # Can run plot(fit, trace = TRUE) to view trace plots
+#' plot(fit) 
 #' 
 #' 
+#' #---------------------------------------------------------------------------
 #' # Example 2: Vecchia approximated model
+#' #---------------------------------------------------------------------------
 #' 
-#' fit <- bhetGP(x, y, nmcmc = 100, vecchia = TRUE, m = 5)
+#' # Fitting a bhetGP model with vecchia approximation. Two cores for OpenMP
+#' fit <- bhetGP(x, y, nmcmc = 100, vecchia = TRUE, m = 5, omp_cores = 2, verb = FALSE)
+#' 
+#' # Trimming the object to remove burn in and thin samples
 #' fit <- trim(fit, 50, 10)
-#' fit <- predict(fit, xx, cores = 2, vecchia = TRUE)
+#' 
+#' # Predition using the bhetGP_vec object with joint predictions (lite = FALSE)
+#' # Two cores for OpenMP, default setting (omp_cores = 2). No SNOW
+#' fit <- predict(fit, xx, lite = FALSE, vecchia = TRUE) 
+#'
+#' # Visualizing the mean predictive surface
 #' plot(fit)
 #' 
 #' \donttest{
-#' 
+#' #--------------------------------------------------------------------------- 
 #' # Example 3: Vecchia inference, non-vecchia predictions
-#' fit <- bhetGP(x, y, nmcmc = 200, vecchia = TRUE, m = 5)
+#' #---------------------------------------------------------------------------
+#' 
+#' # Fitting a bhetGP model with vecchia approximation. Two cores for OpenMP
+#' fit <- bhetGP(x, y, nmcmc = 200, vecchia = TRUE, m = 5, omp_cores = 2)
+#' 
+#' # Trimming the object to remove burn in and thin samples
 #' fit <- trim(fit, 100, 10)
-#' fit <- predict(fit, xx, cores = 2, vecchia = FALSE)
+#'
+#' # Predition using the bhetGP object with joint predictions (lite = FALSE)
+#' # Two cores for OpenMP which is default setting (omp_cores = 2)
+#' # Two cores for SNOW (cores = 2)
+#' fit <- predict(fit, xx, vecchia = FALSE, cores = 2, lite = FALSE)
+#' 
+#' # Visualizing the mean predictive surface
 #' plot(fit)
 #' }
 #' 
-#'
 #' @export
 
 bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000, 
@@ -229,7 +261,7 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
                    cov = c("exp2", "matern", "ARD matern"), v = 2.5, 
                    stratergy = c("default", "flat"),
                    vecchia = FALSE, m = min(25, length(y) - 1), ordering = NULL, 
-                   verb = TRUE, cores = 4){
+                   verb = TRUE, omp_cores = 4){
   
   tic <- proc.time()[[3]]
   cov <- match.arg(cov)
@@ -301,7 +333,7 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
     initial$llik_y <- calc$llik
     initial$tau2_y <- calc$tau2
     
-    test <- check_inputs(x, y, initial$tau2_y) # returns NULL if all checks pass
+    test <- check_inputs(x, y) # returns NULL if all checks pass
     
     
     if (nmcmc == 1) {
@@ -322,7 +354,7 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
   } else{ # vecchia
     out$m <- m # neighbours
     out$ordering <- ordering # order
-    x_approx <- create_approx(Xn, m, ordering, cores = cores) # create approximation
+    x_approx <- create_approx(Xn, m, ordering, cores = omp_cores) # create approximation
 
     if(is.null(reps))
       YNs2_ord <- NULL # If no reps, use Xn and Yn (no YN)
@@ -339,7 +371,7 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
     initial$llik_y <- calc$llik
     initial$tau2_y <- calc$tau2
     
-    test <- check_inputs(x, y, initial$tau2_y) # returns NULL if all checks pass
+    test <- check_inputs(x, y) # returns NULL if all checks pass
     
     if (nmcmc == 1) {
       out <- c(out, initial)
@@ -465,10 +497,9 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
 #' @param ordering optional ordering for Vecchia approximation, must correspond
 #'        to rows of \code{x}, defaults to random, is applied to \code{x}
 #' @param verb logical indicating whether to print progress
-#' @param cores if \code{vecchia = TRUE}, user may specify the number of cores to
-#'        use for OpenMP parallelization.  Defaults to \code{min(2, maxcores - 1)} 
-#'        where \code{maxcores} is the number of detectable available cores.
-#'        
+#' @param omp_cores if \code{vecchia = TRUE}, user may specify the number of cores to
+#'        use for OpenMP parallelization. Uses min(4, limit) where limit is max openMP 
+#'        cores available on the machine.
 #' @return a list of the S3 class \code{bhomgp} or \code{bhomgp_vec} with elements:
 #' \itemize{
 #'   \item \code{x}: copy of input matrix
@@ -501,6 +532,10 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
 #' Sauer, Annie Elizabeth. "Deep Gaussian process surrogates for computer experiments." (2023).
 #' 
 #' @examples 
+#' 
+#' # 1D example with constant noise
+#' 
+#' # Truth
 #' fx <- function(x){
 #' result <- (6 * x - 2)^2* sin(12 * x - 4)
 #' }
@@ -511,23 +546,44 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
 #' x <- rep(xn, r)
 #'
 #' f <- fx(x) 
-#' y <- f + rnorm(length(x))
+#' y <- f + rnorm(length(x)) # adding constant noise
 #' 
 #' # Testing data
 #' xx <- seq(0, 1, length = 100)
 #' yy <- fx(xx)
 #' 
+#---------------------------------------------------------------------------
 #' # Example 1: Full model, no Vecchia
-#' fit <- bhomGP(x, y, nmcmc = 100)
-#' fit <- trim(fit, 50, 10)
-#' fit <- predict(fit, xx)
-#' plot(fit) # can run with trace = TRUE to view trace plots
+#---------------------------------------------------------------------------
 #' 
-#' # Example 2: Vecchia approximated model
-#' fit <- bhomGP(x, y, nmcmc = 100, vecchia = TRUE, m = 5)
+#' # Fitting a bhomGP model using all the data
+#' fit <- bhomGP(x, y, nmcmc = 100, verb = FALSE)
+#' 
+#' # Trimming the object to remove burn in and thin samples
 #' fit <- trim(fit, 50, 10)
-#' fit <- predict(fit, xx, vecchia = TRUE)
-#' plot(fit)
+#' 
+#' # Predition using the bhomGP object (indepedent predictions)
+#' fit <- predict(fit, xx, lite = TRUE, cores = 2)
+#' 
+#' #' # Visualizing the mean predictive surface. 
+#' # Can run plot(fit, trace = TRUE) to view trace plots
+#' plot(fit) 
+#' 
+#---------------------------------------------------------------------------
+#' # Example 2: Vecchia approximated model
+#---------------------------------------------------------------------------
+#' 
+#' # Fitting a bhomGP model using vecchia approximation
+#' fit <- bhomGP(x, y, nmcmc = 100, vecchia = TRUE, m = 5, omp_cores = 2, verb = FALSE)
+#' 
+#' # Trimming the object to remove burn in and thin samples
+#' fit <- trim(fit, 50, 10)
+#' 
+#' # Predition using the bhomGP_vec object with Vecchia (indepedent predictions)
+#' fit <- predict(fit, xx, vecchia = TRUE, cores = 2)
+#' 
+#' # Visualizing the mean predictive surface.
+#' plot(fit) 
 #'
 #' @export
 bhomGP <- function(x = NULL, y = NULL, reps_list = NULL, 
@@ -536,7 +592,7 @@ bhomGP <- function(x = NULL, y = NULL, reps_list = NULL,
                    cov = c("exp2", "matern", "ARD matern"), v = 2.5,
                    stratergy = c("default", "flat"),
                    vecchia = FALSE, m = min(25, length(y) - 1),
-                   ordering = NULL, reps = TRUE, verb = TRUE, cores = 4){
+                   ordering = NULL, reps = TRUE, verb = TRUE, omp_cores = 4){
 
   tic <- proc.time()[[3]]
   cov <- match.arg(cov)
@@ -607,7 +663,7 @@ bhomGP <- function(x = NULL, y = NULL, reps_list = NULL,
     initial$llik_y <- calc$llik
     initial$tau2_y <- calc$tau2
     
-    test <- check_inputs(x, y, initial$tau2_y) # returns NULL if all checks pass
+    test <- check_inputs(x, y) # returns NULL if all checks pass
     
     if (nmcmc == 1) {
       out <- c(out, initial)
@@ -623,7 +679,7 @@ bhomGP <- function(x = NULL, y = NULL, reps_list = NULL,
   else{ # vecchia
     out$m <- m
     out$ordering <- ordering
-    x_approx <- create_approx(Xn, m, ordering, cores = cores)
+    x_approx <- create_approx(Xn, m, ordering, cores = omp_cores)
 
     if(!is.null(reps)){ # woodbury
       # YN_ord <- unlist(Ylist[x_approx$ord])
@@ -640,7 +696,7 @@ bhomGP <- function(x = NULL, y = NULL, reps_list = NULL,
     initial$llik_y <- calc$llik
     initial$tau2_y <- calc$tau2
     
-    test <- check_inputs(x, y, initial$tau2_y) # returns NULL if all checks pass
+    test <- check_inputs(x, y) # returns NULL if all checks pass
     
     if (nmcmc == 1) {
       out <- c(out, initial)
@@ -671,7 +727,7 @@ bhetGP_vdims <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000, D =
                    vdims = NULL, # does variance change in all dims
                    cov = c("exp2", "matern", "ARD matern"), v = 2.5, 
                    stratergy = c("default", "flat"), vecchia = FALSE,
-                   m = min(25, length(y) - 1), ordering = NULL, verb = TRUE, cores = 4){
+                   m = min(25, length(y) - 1), ordering = NULL, verb = TRUE, omp_cores = 4){
   
   tic <- proc.time()[[3]]
   cov <- match.arg(cov)
@@ -683,7 +739,7 @@ bhetGP_vdims <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000, D =
   if(!is.null(reps_list)){x <- reps_list$X0; y <- reps_list$Z0}
   
   if (is.numeric(x)) x <- as.matrix(x)
-  test <- check_inputs(x, y, 1) # returns NULL if all checks pass
+  test <- check_inputs(x, y) # returns NULL if all checks pass
   
   if(reps){ # woodbury version
     if(verb) print("obtaining replication")
@@ -768,7 +824,7 @@ bhetGP_vdims <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000, D =
   } else{ # vecchia
     out$m <- m # neighbours
     out$ordering <- ordering # order
-    x_approx <- create_approx(Xn, m, ordering, cores = cores) # create approximation
+    x_approx <- create_approx(Xn, m, ordering, cores = omp_cores) # create approximation
     
     if(is.null(reps))
       YNs2_ord <- NULL # If no reps, use Xn and Yn (no YN)

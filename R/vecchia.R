@@ -18,9 +18,17 @@ rand_mvn_vec <- function(approx, theta, v, mean = 0,
   
   # create U based on x_approx
   Uraw <- create_U(approx, g, theta, v, sep = sep, raw_form = TRUE)/sqrt(scale)
+  if(any(is.na(Uraw))) message("Uraw containing NAs can cause issues later")
+  if(all(Uraw[which(is.na(approx$NNarray))] != 0)) stop("non-zero mult")
   
+  # get rid of NAs before going into C/C++ : checked to ensure exact results
+  NNclean <- approx$NNarray
+  NNclean[is.na(NNclean)] <- 0
+
   #forward solve to obtain lam prior
-  sample <- forward_solve_raw(Uraw, z, approx$NNarray)
+  sample <- forward_solve_raw(Uraw, z, NNclean)
+  # sample <- forward_solve_raw(Uraw, z, approx$NNarray)
+  # stop("check")
   
   # arrange lam prior for original x order (not x_approx ord)
   sample <- sample[approx$rev_ord_obs] + mean
@@ -32,6 +40,7 @@ rand_mvn_vec <- function(approx, theta, v, mean = 0,
 create_U <- function(approx, g, theta, v, sep = FALSE,
                      raw_form = FALSE) {
   
+  # get rid of NAs before going into C/C++ : checked to ensure exact results
   revNN <- approx$revNN
   revNN[is.na(revNN)] <- 0
   
@@ -82,12 +91,14 @@ create_approx <- function(x, m, ordering = NULL, cores = NULL) {
   NNarray <- GpGp::find_ordered_nn(x_ord, m)
   revNN <- rev_matrix(NNarray)
   notNA <- as.vector(t(!is.na(NNarray)))
-  pointers <- row_col_pointers(NNarray)
 
-  if(is.null(cores))
-    n_cores <- min(parallel::detectCores(all.tests = FALSE, logical = TRUE), 2)
-  else 
-    n_cores <- cores
+  # get rid of NAs before going into C/C++ : checked to ensure exact results
+  NNclean <- NNarray
+  NNclean[is.na(NNclean)] <- 0
+  pointers <- row_col_pointers(NNclean)
+  # pointers <- row_col_pointers(NNarray)
+  
+  n_cores <- check_cores(cores)
   
   out <- list(m = m, ord = ordering, NNarray = NNarray, revNN = revNN, 
               notNA = notNA, pointers = pointers,
@@ -130,7 +141,15 @@ add_pred_to_approx <- function(approx, x_pred, m, ordering_new = NULL) {
   NNarray <- GpGp::find_ordered_nn(x_ord, m)
   revNN <- rev_matrix(NNarray)
   notNA <- as.vector(t(!is.na(NNarray)))
-  pointers <- row_col_pointers(NNarray)
+  
+  # Convert all NNarray NA inds to 0 before passing into C/Cpp
+  NNclean <- NNarray
+  NNclean[is.na(NNclean)] <- 0
+  pointers <- row_col_pointers(NNclean)
+  
+  if (any(is.na(pointers))) stop("There should be no NAs in pointers")
+  if (any(pointers == 0)) stop("There should be no 0s in pointers")
+  # pointers <- row_col_pointers(NNarray)
 
   out <- list(m = m, ord = ord, NNarray = NNarray, revNN = revNN, 
               notNA = notNA, pointers = pointers,

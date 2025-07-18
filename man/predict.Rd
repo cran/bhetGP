@@ -31,6 +31,7 @@
   m = object$m,
   ordering_new = NULL,
   cores = 1,
+  omp_cores = 2,
   samples = TRUE,
   ...
 )
@@ -56,6 +57,7 @@
   m = object$m,
   ordering_new = NULL,
   cores = 1,
+  omp_cores = 2,
   samples = TRUE,
   ...
 )
@@ -96,6 +98,9 @@ including latent layer.}
 \item{ordering_new}{optional ordering for Vecchia approximation, must correspond
 to rows of \code{x_new}, defaults to random, is applied to all layers
 in deeper models.}
+
+\item{omp_cores}{sets cores used for OpenMP if \code{vechhia = TRUE} and 
+\code{lite = FALSE}.}
 }
 \value{
 object of the same class with the following additional elements:

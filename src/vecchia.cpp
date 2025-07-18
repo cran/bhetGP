@@ -34,10 +34,13 @@ NumericVector forward_solve_raw(NumericMatrix U, NumericVector z,
   for (int i = 1; i < n; i++) {
     int B = min(i + 1, mp1);
     y(i) = z(i);
-    for (int j = 1; j < B; j++) {
-      y(i) -= U(i, j) * y(NNarray(i, j) - 1);
-    }
-    y(i) = y(i) / U(i, 0);
+    for (int j = 1; j < B; j++) { // continue comes back up here. Ignores update
+      if (NNarray(i, j) == 0) continue; // this avoids passing NA altogether & ignores 0
+      if (NumericVector::is_na(NNarray(i, j))) continue; //this ignores NA (in case passed)
+      y(i) -= U(i, j) * y(NNarray(i, j) - 1); // U(i , j) = 0 if NN(i, j) = NA
+      // if NNarray(i, j) was NA, you would just have y(i) = y(i) - 0 --> y(i)
+    } 
+    y(i) = y(i) / U(i, 0); //scaling to OG
   }
   return y;
 }
@@ -131,8 +134,9 @@ arma::mat U_entries(const int Ncores, const arma::mat& x, const arma::umat& revN
   arma::mat covmat;
   
 #ifdef _OPENMP
-  
-#pragma omp parallel for num_threads(Ncores) shared(Lentries) schedule(static)
+
+// # pragma omp parallel for num_threads(threads) shared(Lentries) schedule(static)
+# pragma omp parallel for num_threads(Ncores) shared(Lentries) schedule(static)
   for (int k = 0; k < n; k++) {
     arma::uvec inds = revNNarray.row(k).t();
     arma::uvec inds00 = inds.elem(find(inds > 0)) - 1;
@@ -292,43 +296,63 @@ void check_omp () {
   #ifdef _OPENMP
     // DO NOTHING
   #else 
-    Rcout << "NOTE: OpenMP install suggested for best results; see ?fit_two_layer for details \n";
+    Rcout << "NOTE: OpenMP install suggested for best results; see ?bhetGP for details \n";
   #endif
+}
+
+// [[Rcpp::export]]
+int check_cores (const int Ncores) {
+int threads = Ncores;
+#ifdef _OPENMP
+   int max_threads = omp_get_max_threads(); // this gives max cores on comp
+   if (threads > max_threads) {
+   // Rcpp::Rcout << "Adjusting Ncores: requested " << threads
+   //            << ", using max available (" << limit_threads << ").\n"; //sanity
+   threads = max_threads;
+   }
+#else 
+  threads = 0;
+#endif
+return(threads);
 }
   
 // [[Rcpp::export]]
 arma::mat row_col_pointers(const arma::umat& NNarray) {
     
-  const int m = NNarray.n_cols- 1;
-  const int n = NNarray.n_rows;
+  const int m = NNarray.n_cols- 1; // removing one col. dim
+  const int n = NNarray.n_rows; 
   int start, col_count;
     
   int length = (n - m) * (m + 1);
   for (int i = 1; i <= m; i ++)
     length += i;
     
-  arma::mat pointers = zeros(length, 2);
-    
+  arma::mat pointers = zeros(length, 2); // 2 columns only
+  
+  // To get rid of NAs: first pass them as zeros; 
+  // Since they are always in first m columns starting from last index, they 
+  // are never accessed because i <= m ---> for first m, only does first i elements
+  
   start = 0;
-  for (int i = 1; i <= n; i++) {
-    if (i <= m) {
-      col_count = i - 1;
-      for (int j = start; j < start + i; j++) {
-        pointers(j, 0) = i;
-        pointers(j, 1) = NNarray(i - 1, col_count);
-        col_count -= 1;
+  for (int i = 1; i <= n; i++) { // starts from index 1
+    if (i <= m) { // accesses only i of m elements
+      col_count = i - 1; // how many elements will the row have; gives rhs start point
+      for (int j = start; j < start + i; j++) { // start with 0 based index
+        pointers(j, 0) = i; // row index = column first element
+        pointers(j, 1) = NNarray(i - 1, col_count); // From NN array use (i - 1), col neighbor
+        col_count -= 1; // move left of columns
       }
-      start += i;
-    } else {
+      start += i; // move pointer
+    } else { // reached max cols
       col_count = m;
       for (int j = start; j < start + m + 1; j++) {
         pointers(j, 0) = i;
         pointers(j, 1) = NNarray(i - 1, col_count);
         col_count -= 1;
       }
-      start += m + 1;
+      start += m + 1; // move by by m + 1 positions (next row start)
     }
   }
-  return pointers;
+  return pointers; // returns row <-- neighbors starting from RHS
 }
 

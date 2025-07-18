@@ -73,6 +73,10 @@ check_omp <- function() {
     invisible(.Call(`_bhetGP_check_omp`))
 }
 
+check_cores <- function(Ncores) {
+    .Call(`_bhetGP_check_cores`, Ncores)
+}
+
 row_col_pointers <- function(NNarray) {
     .Call(`_bhetGP_row_col_pointers`, NNarray)
 }

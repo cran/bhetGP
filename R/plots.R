@@ -82,23 +82,26 @@ plot.bhetgp <- function(x, trace = NULL, predict = NULL, verb = TRUE,...) {
     if (predict) {
       if (ncol(x$x) == 1) {
         par(mfrow = c(1, 1), mar = c(4, 4, 2, 2))
-        if (is.null(x$Sigma)) {
-          q1 <- x$mean + qnorm(0.05, 0, sqrt(x$s2_y))
-          q3 <- x$mean + qnorm(0.95, 0, sqrt(x$s2_y))
+        if (is.null(x$Sigma) && is.null(x$Sigma_ci)) {
+          s2 <- ifel(is.null(x$s2_y), x$s2_y_ci, x$s2_y)
+          q1 <- x$mean + qnorm(0.05, 0, sqrt(s2))
+          q3 <- x$mean + qnorm(0.95, 0, sqrt(s2))
         } else {
-          Sigma_smooth <- x$Sigma - diag(exp(x$mean_lnugs) * mean(x$tau2), nrow(x$x_new))
-          y_samples <- t(mvtnorm::rmvnorm(50, x$mean, Sigma_smooth))
-          q1 <- x$mean + qnorm(0.05, 0, sqrt(diag(x$Sigma)))
-          q3 <- x$mean + qnorm(0.95, 0, sqrt(diag(x$Sigma)))
+          # Sigma_smooth <- x$Sigma - diag(exp(x$mean_lnugs) * mean(x$tau2), nrow(x$x_new))
+          # y_samples <- t(mvtnorm::rmvnorm(50, x$mean, x$Sigma_ci))
+          # y_samples <- x$mean
+          sig <- ifel(is.null(x$Sigma), x$Sigma_ci, x$Sigma)
+          q1 <- x$mean + qnorm(0.05, 0, sqrt(diag(sig)))
+          q3 <- x$mean + qnorm(0.95, 0, sqrt(diag(sig)))
         }
         o <- order(x$x_new)
         plot(x$x_new[o], x$mean[o], type = 'l', xlab = 'X', ylab = 'Y', 
              ylim = c(min(q1), max(q3)),
              col = 'blue')
-        if (!is.null(x$Sigma)) {
-          matlines(x$x_new[o], y_samples[o,], col = 'lightblue', lty = 1)
-          lines(x$x_new[o], x$mean[o], col = 'blue')
-        }
+        # if (!is.null(x$Sigma_ci)) {
+        #   matlines(x$x_new[o], y_samples[o,], col = 'lightblue', lty = 1)
+        #   lines(x$x_new[o], x$mean[o], col = 'blue')
+        # }
         lines(x$x_new[o], q1[o], col = 'blue', lty = 2)
         lines(x$x_new[o], q3[o], col = 'blue', lty = 2)
         points(rep(x$x, x$A), unlist(x$Ylist), pch = 20, col = "gray")
@@ -110,9 +113,13 @@ plot.bhetgp <- function(x, trace = NULL, predict = NULL, verb = TRUE,...) {
         }
         cols <- heat.colors(128)
         i1 <- interp::interp(x$x_new[, 1], x$x_new[, 2], x$mean)
-        if (is.null(x$Sigma)) {
-          i2 <- interp::interp(x$x_new[, 1], x$x_new[, 2], sqrt(x$s2_y))
-        } else i2 <- interp::interp(x$x_new[, 1], x$x_new[, 2], sqrt(diag(x$Sigma)))
+        if (is.null(x$Sigma) && is.null(x$Sigma_ci)) {
+          s2 <- ifel(is.null(x$s2_y), x$s2_y_ci, x$s2_y)
+          i2 <- interp::interp(x$x_new[, 1], x$x_new[, 2], sqrt(s2))
+        } else{
+          sig <- ifel(is.null(x$Sigma), x$Sigma_ci, x$Sigma)
+          i2 <- interp::interp(x$x_new[, 1], x$x_new[, 2], sqrt(diag(sig)))
+        } 
         
         par(mfrow = c(1, 2), mar = c(4, 4, 3, 2))
         image(i1, col = cols, main = 'Posterior Mean', xlab = 'X1', ylab = 'X2')
@@ -169,23 +176,26 @@ plot.bhomgp <- function(x, trace = NULL, predict = NULL, verb = TRUE,...) {
     if (predict) {
       if (ncol(x$x) == 1) {
         par(mfrow = c(1, 1), mar = c(4, 4, 2, 2))
-        if (is.null(x$Sigma)) {
-          q1 <- x$mean + qnorm(0.05, 0, sqrt(x$s2_y))
-          q3 <- x$mean + qnorm(0.95, 0, sqrt(x$s2_y))
+        if (is.null(x$Sigma) && is.null(x$Sigma_ci)) {
+          s2 <- ifel(is.null(x$s2_y), x$s2_y_ci, x$s2_y)
+          q1 <- x$mean + qnorm(0.05, 0, sqrt(s2))
+          q3 <- x$mean + qnorm(0.95, 0, sqrt(s2))
         } else {
-          Sigma_smooth <- x$Sigma - diag(exp(x$mean_lnugs) * mean(x$tau2), nrow(x$x_new))
-          y_samples <- t(mvtnorm::rmvnorm(50, x$mean, Sigma_smooth))
-          q1 <- x$mean + qnorm(0.05, 0, sqrt(diag(x$Sigma)))
-          q3 <- x$mean + qnorm(0.95, 0, sqrt(diag(x$Sigma)))
+          # Sigma_smooth <- x$Sigma - diag(exp(x$mean_lnugs) * mean(x$tau2), nrow(x$x_new))
+          # y_samples <- t(mvtnorm::rmvnorm(50, x$mean, x$Sigma_ci))
+          # y_samples <- x$mean
+          sig <- ifel(is.null(x$Sigma), x$Sigma_ci, x$Sigma)
+          q1 <- x$mean + qnorm(0.05, 0, sqrt(diag(sig)))
+          q3 <- x$mean + qnorm(0.95, 0, sqrt(diag(sig)))
         }
         o <- order(x$x_new)
         plot(x$x_new[o], x$mean[o], type = 'l', xlab = 'X', ylab = 'Y', 
              ylim = c(min(q1), max(q3)),
              col = 'blue')
-        if (!is.null(x$Sigma)) {
-          matlines(x$x_new[o], y_samples[o,], col = 'lightblue', lty = 1)
-          lines(x$x_new[o], x$mean[o], col = 'blue')
-        }
+        # if (!is.null(x$Sigma_ci)) {
+        #   matlines(x$x_new[o], y_samples[o,], col = 'lightblue', lty = 1)
+        #   lines(x$x_new[o], x$mean[o], col = 'blue')
+        # }
         lines(x$x_new[o], q1[o], col = 'blue', lty = 2)
         lines(x$x_new[o], q3[o], col = 'blue', lty = 2)
         points(rep(x$x, x$A), unlist(x$Ylist), pch = 20, col = "gray")
@@ -197,9 +207,13 @@ plot.bhomgp <- function(x, trace = NULL, predict = NULL, verb = TRUE,...) {
         }
         cols <- heat.colors(128)
         i1 <- interp::interp(x$x_new[, 1], x$x_new[, 2], x$mean)
-        if (is.null(x$Sigma)) {
-          i2 <- interp::interp(x$x_new[, 1], x$x_new[, 2], sqrt(x$s2_y))
-        } else i2 <- interp::interp(x$x_new[, 1], x$x_new[, 2], sqrt(diag(x$Sigma)))
+        if (is.null(x$Sigma) && is.null(x$Sigma_ci)) {
+          s2 <- ifel(is.null(x$s2_y), x$s2_y_ci, x$s2_y)
+          i2 <- interp::interp(x$x_new[, 1], x$x_new[, 2], sqrt(s2))
+        } else{
+          sig <- ifel(is.null(x$Sigma), x$Sigma_ci, x$Sigma)
+          i2 <- interp::interp(x$x_new[, 1], x$x_new[, 2], sqrt(diag(sig)))
+        } 
         
         par(mfrow = c(1, 2), mar = c(4, 4, 3, 2))
         image(i1, col = cols, main = 'Posterior Mean', xlab = 'X1', ylab = 'X2')

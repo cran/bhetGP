@@ -50,6 +50,8 @@
 #'        to rows of \code{x_new}, defaults to random, is applied to all layers
 #'        in deeper models.
 #' @param cores number of cores to utilize for SNOW parallelization
+#' @param omp_cores sets cores used for OpenMP if \code{vechhia = TRUE} and 
+#'        \code{lite = FALSE}. 
 #' @param samples logical indicating if you want all posterior samples returned 
 #'        including latent layer.
 #' @param ... N/A
@@ -134,7 +136,7 @@ predict.bhetgp <- function(object, x_new, lite = TRUE, return_all = FALSE,
 predict.bhetgp_vec <- function(object, x_new, lite = TRUE, return_all = FALSE, 
                                interval = c("pi", "ci", "both"), lam_ub = TRUE,
                                vecchia = FALSE, m = object$m, ordering_new = NULL,
-                               cores = 1, samples = TRUE, ...){
+                               cores = 1, omp_cores = 2, samples = TRUE, ...){
   
   # ub_lam --> 95% uber bound of lambda for PI of y.
   interval <- match.arg(interval)
@@ -142,9 +144,12 @@ predict.bhetgp_vec <- function(object, x_new, lite = TRUE, return_all = FALSE,
                 ordering_new = ordering_new, cores = cores, interval = interval,
                 samples = samples, ub = lam_ub)
   
+  # Checks OpenMP cores for Umat parallelizing
+  omp_cores <- check_cores(omp_cores)
+  object$x_approx$n_cores <- omp_cores
   out <- list()
   
-  if(!vecchia){
+  if(!vecchia){ # You can do non-vec prediction for vec created object
     if(is.null(object$settings$vdims)) out <- predict_nonvec(object, x_new, settings)
     else out <- predict_nonvec_vdims(object, x_new, settings, mapping = object$mappings)
   }else{
@@ -175,14 +180,18 @@ predict.bhomgp <- function(object, x_new, lite = TRUE, return_all = FALSE,
 predict.bhomgp_vec <- function(object, x_new, lite = TRUE, return_all = FALSE,
                            interval = c("pi", "ci", "both"),
                            vecchia = FALSE, m = object$m,  ordering_new = NULL, 
-                           cores = 1, samples = TRUE, ...){
+                           cores = 1, omp_cores = 2, samples = TRUE, ...){
   
   interval <- match.arg(interval)  
   settings <- c(object$settings, lite = lite, return_all = return_all,
                 ordering_new = ordering_new, cores = cores,  interval = interval)
   
+  # Checks OpenMP cores for Umat parallelizing
+  omp_cores <- check_cores(omp_cores)
+  object$x_approx$n_cores <- omp_cores
   out <- list()
   
+  # can do non vec predictions for vec object
   if(!vecchia) out <- predict_hom(object, x_new, settings)
   else out <- predict_vec_hom(object, x_new, m, settings)
   

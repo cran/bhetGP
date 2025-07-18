@@ -276,6 +276,17 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// check_cores
+int check_cores(const int Ncores);
+RcppExport SEXP _bhetGP_check_cores(SEXP NcoresSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const int >::type Ncores(NcoresSEXP);
+    rcpp_result_gen = Rcpp::wrap(check_cores(Ncores));
+    return rcpp_result_gen;
+END_RCPP
+}
 // row_col_pointers
 arma::mat row_col_pointers(const arma::umat& NNarray);
 RcppExport SEXP _bhetGP_row_col_pointers(SEXP NNarraySEXP) {
@@ -304,26 +315,27 @@ extern "C" {
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_bhetGP_diag_quad_mat", (DL_FUNC) &_bhetGP_diag_quad_mat, 2},
-    {"_bhetGP_Exp2", (DL_FUNC) &_bhetGP_Exp2, 4},
-    {"_bhetGP_Exp2vec", (DL_FUNC) &_bhetGP_Exp2vec, 4},
-    {"_bhetGP_Exp2Sep", (DL_FUNC) &_bhetGP_Exp2Sep, 5},
-    {"_bhetGP_Exp2SepVec", (DL_FUNC) &_bhetGP_Exp2SepVec, 5},
-    {"_bhetGP_Matern", (DL_FUNC) &_bhetGP_Matern, 5},
-    {"_bhetGP_MaternSep", (DL_FUNC) &_bhetGP_MaternSep, 6},
-    {"_bhetGP_MaternVec", (DL_FUNC) &_bhetGP_MaternVec, 5},
-    {"_bhetGP_MaternSepVec", (DL_FUNC) &_bhetGP_MaternSepVec, 6},
-    {"_bhetGP_MaternProdSep", (DL_FUNC) &_bhetGP_MaternProdSep, 6},
-    {"_bhetGP_MaternProdSepVec", (DL_FUNC) &_bhetGP_MaternProdSepVec, 6},
-    {"_bhetGP_forward_solve_raw", (DL_FUNC) &_bhetGP_forward_solve_raw, 3},
-    {"_bhetGP_rev_matrix", (DL_FUNC) &_bhetGP_rev_matrix, 1},
-    {"_bhetGP_U_entries_Hom", (DL_FUNC) &_bhetGP_U_entries_Hom, 7},
-    {"_bhetGP_U_entries", (DL_FUNC) &_bhetGP_U_entries, 7},
-    {"_bhetGP_U_entries_sep_Hom", (DL_FUNC) &_bhetGP_U_entries_sep_Hom, 7},
-    {"_bhetGP_U_entries_sep", (DL_FUNC) &_bhetGP_U_entries_sep, 7},
-    {"_bhetGP_check_omp", (DL_FUNC) &_bhetGP_check_omp, 0},
-    {"_bhetGP_row_col_pointers", (DL_FUNC) &_bhetGP_row_col_pointers, 1},
-    {NULL, NULL, 0}
+  {"_bhetGP_diag_quad_mat", (DL_FUNC) &_bhetGP_diag_quad_mat, 2},
+  {"_bhetGP_Exp2", (DL_FUNC) &_bhetGP_Exp2, 4},
+  {"_bhetGP_Exp2vec", (DL_FUNC) &_bhetGP_Exp2vec, 4},
+  {"_bhetGP_Exp2Sep", (DL_FUNC) &_bhetGP_Exp2Sep, 5},
+  {"_bhetGP_Exp2SepVec", (DL_FUNC) &_bhetGP_Exp2SepVec, 5},
+  {"_bhetGP_Matern", (DL_FUNC) &_bhetGP_Matern, 5},
+  {"_bhetGP_MaternSep", (DL_FUNC) &_bhetGP_MaternSep, 6},
+  {"_bhetGP_MaternVec", (DL_FUNC) &_bhetGP_MaternVec, 5},
+  {"_bhetGP_MaternSepVec", (DL_FUNC) &_bhetGP_MaternSepVec, 6},
+  {"_bhetGP_MaternProdSep", (DL_FUNC) &_bhetGP_MaternProdSep, 6},
+  {"_bhetGP_MaternProdSepVec", (DL_FUNC) &_bhetGP_MaternProdSepVec, 6},
+  {"_bhetGP_forward_solve_raw", (DL_FUNC) &_bhetGP_forward_solve_raw, 3},
+  {"_bhetGP_rev_matrix", (DL_FUNC) &_bhetGP_rev_matrix, 1},
+  {"_bhetGP_U_entries_Hom", (DL_FUNC) &_bhetGP_U_entries_Hom, 7},
+  {"_bhetGP_U_entries", (DL_FUNC) &_bhetGP_U_entries, 7},
+  {"_bhetGP_U_entries_sep_Hom", (DL_FUNC) &_bhetGP_U_entries_sep_Hom, 7},
+  {"_bhetGP_U_entries_sep", (DL_FUNC) &_bhetGP_U_entries_sep, 7},
+  {"_bhetGP_check_omp", (DL_FUNC) &_bhetGP_check_omp, 0},
+  {"_bhetGP_check_cores", (DL_FUNC) &_bhetGP_check_cores, 1},
+  {"_bhetGP_row_col_pointers", (DL_FUNC) &_bhetGP_row_col_pointers, 1},
+  {NULL, NULL, 0}
 };
 
 RcppExport void R_init_bhetGP(DllInfo *dll) {

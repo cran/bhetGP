@@ -20,7 +20,7 @@ bhetGP(
   m = min(25, length(y) - 1),
   ordering = NULL,
   verb = TRUE,
-  cores = 4
+  omp_cores = 4
 )
 }
 \arguments{
@@ -75,9 +75,9 @@ to rows of \code{x}, defaults to random, is applied to \code{x} (only used if
 
 \item{verb}{logical indicating whether to print progress}
 
-\item{cores}{logical; if \code{vecchia = TRUE}, user may specify the number of cores to
-use for OpenMP parallelization.  Defaults to \code{min(2, maxcores - 1)} 
-where \code{maxcores} is the number of detectable available cores.}
+\item{omp_cores}{logical; if \code{vecchia = TRUE}, user may specify the number of cores to
+use for OpenMP parallelization. Uses min(4, limit) where limit is max openMP 
+cores available on the machine.}
 }
 \value{
 a list of the S3 class \code{bhetgp} or \code{bhetgp_vec} with elements:
@@ -195,20 +195,22 @@ Maps inputs \code{x} to mean response \code{y} and noise levels
     use with \code{trim}, \code{predict}, and \code{plot}.
 }
 \examples{
-#' @examples 
-# Additional examples including real-world computer experiments are available at: 
-# https://bitbucket.org/gramacylab/bhgp/src/main/examples
 
+# 1D function with 1D noise 
+
+# Truth
 fx <- function(x){
 result <- (6 * x - 2)^2* sin(12 * x - 4)
 }
+
+# Noise
 rx <- function(x){
 result <- (1.1 + sin(2 * pi * x))^2
 return(result)
 }
 
 # Training data
-r <- 10
+r <- 10 # replicates
 xn <- seq(0, 1, length = 25)
 x <- rep(xn, r)
 
@@ -222,29 +224,60 @@ y <- f + noise
 xx <- seq(0, 1, length = 100)
 yy <- fx(xx)
 
-# Example 1: Full model, no Vecchia
-fit <- bhetGP(x, y, nmcmc = 100)
+#--------------------------------------------------------------------------- 
+# Example 1: Full model, no Vecchia 
+#---------------------------------------------------------------------------
+
+# Fitting a bhetGP model using all the data
+fit <- bhetGP(x, y, nmcmc = 100, verb = FALSE)
+
+# Trimming the object to remove burn in and thin samples
 fit <- trim(fit, 50, 10)
-fit <- predict(fit, xx, cores = 2)
-plot(fit) # can run with trace = TRUE to view trace plots
+
+# Predition using the bhetGP object (indepedent predictions)
+fit <- predict(fit, xx, cores = 2) 
+
+# Visualizing the mean predictive surface. 
+# Can run plot(fit, trace = TRUE) to view trace plots
+plot(fit) 
 
 
+#---------------------------------------------------------------------------
 # Example 2: Vecchia approximated model
+#---------------------------------------------------------------------------
 
-fit <- bhetGP(x, y, nmcmc = 100, vecchia = TRUE, m = 5)
+# Fitting a bhetGP model with vecchia approximation. Two cores for OpenMP
+fit <- bhetGP(x, y, nmcmc = 100, vecchia = TRUE, m = 5, omp_cores = 2, verb = FALSE)
+
+# Trimming the object to remove burn in and thin samples
 fit <- trim(fit, 50, 10)
-fit <- predict(fit, xx, cores = 2, vecchia = TRUE)
+
+# Predition using the bhetGP_vec object with joint predictions (lite = FALSE)
+# Two cores for OpenMP, default setting (omp_cores = 2). No SNOW
+fit <- predict(fit, xx, lite = FALSE, vecchia = TRUE) 
+
+# Visualizing the mean predictive surface
 plot(fit)
 
 \donttest{
-
+#--------------------------------------------------------------------------- 
 # Example 3: Vecchia inference, non-vecchia predictions
-fit <- bhetGP(x, y, nmcmc = 200, vecchia = TRUE, m = 5)
+#---------------------------------------------------------------------------
+
+# Fitting a bhetGP model with vecchia approximation. Two cores for OpenMP
+fit <- bhetGP(x, y, nmcmc = 200, vecchia = TRUE, m = 5, omp_cores = 2)
+
+# Trimming the object to remove burn in and thin samples
 fit <- trim(fit, 100, 10)
-fit <- predict(fit, xx, cores = 2, vecchia = FALSE)
+
+# Predition using the bhetGP object with joint predictions (lite = FALSE)
+# Two cores for OpenMP which is default setting (omp_cores = 2)
+# Two cores for SNOW (cores = 2)
+fit <- predict(fit, xx, vecchia = FALSE, cores = 2, lite = FALSE)
+
+# Visualizing the mean predictive surface
 plot(fit)
 }
-
 
 }
 \references{

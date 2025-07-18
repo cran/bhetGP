@@ -2,7 +2,7 @@
 #' @importFrom Matrix t solve
 #' @importFrom grDevices heat.colors
 #' @importFrom graphics image lines matlines par plot points contour abline matplot
-#' @importFrom stats cov dgamma dnorm pnorm qnorm rnorm runif var loess predict optimize
+#' @importFrom stats cov dgamma dnorm pnorm qnorm rnorm runif var loess predict optimize sd
 #' @importFrom parallel makeCluster detectCores stopCluster
 #' @importFrom doParallel registerDoParallel
 #' @importFrom foreach %dopar% foreach
@@ -17,8 +17,8 @@
 # Package Documentation -------------------------------------------------------
 #' @useDynLib bhetGP, .registration = TRUE
 #' @title Package bhetGP
-#' @author Parul Vijay Patil \email{parulvijay@vt.edu}
-#' @name bhetgp-package
+#' @author Parul V. Patil \email{parulvijay@vt.edu}
+#' @name bhetGP-package
 #'
 #' @description Performs Bayesian posterior inference for heteroskedastic Gaussian processes.
 #' Models are trained through MCMC including elliptical slice sampling (ESS) of 
@@ -58,7 +58,7 @@
 #' processes for computer experiments. 
 #' Journal of Computational and Graphical Statistics, 32(3), 824-837.  
 #' 
-#' @examples 
-#' # More examples including real-world computer experiments are available at: 
-#' # https://bitbucket.org/gramacylab/bhgp/src/main/examples
+#' @examples
+#' # See ?bhetGP, or ?bhomGP for examples
+#' 
 "_PACKAGE"

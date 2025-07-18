@@ -20,7 +20,7 @@ bhomGP(
   ordering = NULL,
   reps = TRUE,
   verb = TRUE,
-  cores = 4
+  omp_cores = 4
 )
 }
 \arguments{
@@ -70,9 +70,9 @@ use Woodbury inference}
 
 \item{verb}{logical indicating whether to print progress}
 
-\item{cores}{if \code{vecchia = TRUE}, user may specify the number of cores to
-use for OpenMP parallelization.  Defaults to \code{min(2, maxcores - 1)} 
-where \code{maxcores} is the number of detectable available cores.}
+\item{omp_cores}{if \code{vecchia = TRUE}, user may specify the number of cores to
+use for OpenMP parallelization. Uses min(4, limit) where limit is max openMP 
+cores available on the machine.}
 }
 \value{
 a list of the S3 class \code{bhomgp} or \code{bhomgp_vec} with elements:
@@ -167,6 +167,10 @@ Maps inputs \code{x} to mean response \code{y}. Utilizes Metropolis Hastings
     use with \code{trim}, \code{predict}, and \code{plot}.
 }
 \examples{
+
+# 1D example with constant noise
+
+# Truth
 fx <- function(x){
 result <- (6 * x - 2)^2* sin(12 * x - 4)
 }
@@ -177,23 +181,40 @@ xn <- seq(0, 1, length = 25)
 x <- rep(xn, r)
 
 f <- fx(x) 
-y <- f + rnorm(length(x))
+y <- f + rnorm(length(x)) # adding constant noise
 
 # Testing data
 xx <- seq(0, 1, length = 100)
 yy <- fx(xx)
 
 # Example 1: Full model, no Vecchia
-fit <- bhomGP(x, y, nmcmc = 100)
+
+# Fitting a bhomGP model using all the data
+fit <- bhomGP(x, y, nmcmc = 100, verb = FALSE)
+
+# Trimming the object to remove burn in and thin samples
 fit <- trim(fit, 50, 10)
-fit <- predict(fit, xx)
-plot(fit) # can run with trace = TRUE to view trace plots
+
+# Predition using the bhomGP object (indepedent predictions)
+fit <- predict(fit, xx, lite = TRUE, cores = 2)
+
+#' # Visualizing the mean predictive surface. 
+# Can run plot(fit, trace = TRUE) to view trace plots
+plot(fit) 
 
 # Example 2: Vecchia approximated model
-fit <- bhomGP(x, y, nmcmc = 100, vecchia = TRUE, m = 5)
+
+# Fitting a bhomGP model using vecchia approximation
+fit <- bhomGP(x, y, nmcmc = 100, vecchia = TRUE, m = 5, omp_cores = 2, verb = FALSE)
+
+# Trimming the object to remove burn in and thin samples
 fit <- trim(fit, 50, 10)
-fit <- predict(fit, xx, vecchia = TRUE)
-plot(fit)
+
+# Predition using the bhomGP_vec object with Vecchia (indepedent predictions)
+fit <- predict(fit, xx, vecchia = TRUE, cores = 2)
+
+# Visualizing the mean predictive surface.
+plot(fit) 
 
 }
 \references{

@@ -126,12 +126,7 @@ check_initialization_hom <- function(reps, initial, n, D, sep, v, vec = FALSE, v
   
   if(verb) print("obtaining initialization")
   if(stratergy == "default"){
-    # if(ncol(reps$X0) > 1 || nrow(reps$X0) <= 1000)
       init <- inits_bhomgp(reps, v = v, vec = vec)
-    # else{
-    #   warning("vec = T but dim(x) = 1. SVec needs dim(x) > 2. Setting stratergy = flat")
-    #   stratergy = "flat"
-    # } 
   }
   if(stratergy == "flat")
     init <- list(ty = rep(0.1, ncol(reps$X0)), mu_y= 0, scale = 1, g = var(reps$Z)*0.1)
@@ -176,7 +171,7 @@ check_initialization_hom <- function(reps, initial, n, D, sep, v, vec = FALSE, v
   return(initial)
 }
 
-check_inputs <- function(x, y, tau2) {
+check_inputs <- function(x, y) {
   
   if (!is.vector(y)) 
     stop("y must be a vector")
@@ -185,7 +180,7 @@ check_inputs <- function(x, y, tau2) {
   if (min(x) < -5 | min(x) > 5 | max(x) < -4 | max(x) > 6) 
     warning("this function is designed for x over the range [0, 1]")
 
-  if(tau2 > 100)
+  if(stats::sd(y) > 1000)
     warning("standardize response with variance 1 for better results")
   # if (max(y) > 3 * sqrt(tau2) | min(y) < (-3) * sqrt(tau2))
   #   warning("standardize response for mean zero and variance 1 for better results")
