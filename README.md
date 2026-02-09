@@ -47,5 +47,34 @@ src files include:
 
 - **RcppExports.cpp**: created for package
 
+## Updates
+
+- vdims is working now
+
+- removed sq from matern for SV
+
+- predict lam_ub is now by default FALSE
+
+- stratergy = "flat" now working
+
+- priors on theta_lam adjusted ---> ocean example working out better
+
+- ls_check = TRUE by default??? maybe not. 
+
+
+- checks.R --> check_scale() ---> remove print statement
+- check all prints before reupload.
+
+
+------------------------- Next to Dos --------------------------------------
+
+- for nmcmc = 1, make predictions also possible (to be done)
+
+- will need to make joint U preds faster.
+
+## Version 1.0.2
+
+- corrects span error
+- fixed stratergy for initialization
 
 

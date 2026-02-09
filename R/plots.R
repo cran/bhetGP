@@ -47,16 +47,22 @@ plot.bhetgp <- function(x, trace = NULL, predict = NULL, verb = TRUE,...) {
     if(trace){
       if(!x$settings$sep){
         par(mfrow = c(2, 3), mar = c(5, 4, 2, 2))
-        plot(x$theta_lam, type = 'l', lwd = 1, main = "Trace Plot (theta_lam)")
-        plot(x$theta_y, type = 'l', lwd = 1, main = "Trace Plot (theta_y)")
-        plot(x$tau2_lam, type = 'l', lwd = 1, main = "Trace Plot (tau2 lam)")
-        plot(x$tau2, type = 'l', lwd = 1, main = "Trace Plot (tau2)")
-        plot(x$llik_lam, type = 'l', lwd = 1, main = "Trace Plot (llik lam)")
-        plot(x$llik_y, type = 'l', lwd = 1, main = "Trace Plot (llik y)")
+        plot(x$theta_lam, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "theta_lam",
+             main = "Trace Plot (theta_lam)")
+        plot(x$theta_y, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "theta_y",
+             main = "Trace Plot (theta_y)")
+        plot(x$tau2_lam, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "tau2_lam",
+             main = "Trace Plot (tau2 lam)")
+        plot(x$tau2, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "tau2",
+             main = "Trace Plot (tau2)")
+        plot(x$llik_lam, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "llik_lam",
+             main = "Trace Plot (llik lam)")
+        plot(x$llik_y, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "llik_y",
+             main = "Trace Plot (llik y)")
         
         if(ncol(x$x) == 1) {
           par(mfrow = c(1, 1), mar = c(5, 4, 2, 2))
-          matplot(t(x$llam_samples), lty = 1, type = 'l')
+          matplot(t(x$llam_samples), lty = 1, type = 'l', ylab = "log-noise samples")
         }
       }else{
         par(mfrow = c(2, ncol(x$theta_y)), mar = c(5, 4, 2, 2))
@@ -86,26 +92,31 @@ plot.bhetgp <- function(x, trace = NULL, predict = NULL, verb = TRUE,...) {
           s2 <- ifel(is.null(x$s2_y), x$s2_y_ci, x$s2_y)
           q1 <- x$mean + qnorm(0.05, 0, sqrt(s2))
           q3 <- x$mean + qnorm(0.95, 0, sqrt(s2))
+          if(!is.null(x$s2_y_ci) & !is.null(x$s2_y)){
+            q1c <- x$mean + qnorm(0.05, 0, sqrt(x$s2_y_ci))
+            q3c <- x$mean + qnorm(0.95, 0, sqrt(x$s2_y_ci))
+          }else q1c <- NULL
         } else {
-          # Sigma_smooth <- x$Sigma - diag(exp(x$mean_lnugs) * mean(x$tau2), nrow(x$x_new))
-          # y_samples <- t(mvtnorm::rmvnorm(50, x$mean, x$Sigma_ci))
-          # y_samples <- x$mean
           sig <- ifel(is.null(x$Sigma), x$Sigma_ci, x$Sigma)
           q1 <- x$mean + qnorm(0.05, 0, sqrt(diag(sig)))
           q3 <- x$mean + qnorm(0.95, 0, sqrt(diag(sig)))
+          if(!is.null(x$Sigma_ci) & !is.null(x$Sigma)){
+            q1c <- x$mean + qnorm(0.05, 0, sqrt(x$Sigma_ci))
+            q3c <- x$mean + qnorm(0.95, 0, sqrt(x$Sigma_ci))
+          } else q1c <- NULL
         }
         o <- order(x$x_new)
-        plot(x$x_new[o], x$mean[o], type = 'l', xlab = 'X', ylab = 'Y', 
-             ylim = c(min(q1), max(q3)),
-             col = 'blue')
-        # if (!is.null(x$Sigma_ci)) {
-        #   matlines(x$x_new[o], y_samples[o,], col = 'lightblue', lty = 1)
-        #   lines(x$x_new[o], x$mean[o], col = 'blue')
-        # }
-        lines(x$x_new[o], q1[o], col = 'blue', lty = 2)
-        lines(x$x_new[o], q3[o], col = 'blue', lty = 2)
-        points(rep(x$x, x$A), unlist(x$Ylist), pch = 20, col = "gray")
+        plot(rep(x$x, x$A), unlist(x$Ylist), pch = 1, col = "gray",
+             xlab = 'X', ylab = 'Y', ylim = c(min(q1), max(q3)),)
         points(x$x, x$y, pch = 20)
+        lines(x$x_new[o], x$mean[o], col = 'blue', lwd = 1)
+        lines(x$x_new[o], q1[o], col = 'blue', lty = 2, lwd = 1)
+        lines(x$x_new[o], q3[o], col = 'blue', lty = 2, lwd = 1)
+        
+        if(!is.null(q1c)){
+          lines(x$x_new[o], q1c[o], col = 'darkblue', lty = 2, lwd = 3)
+          lines(x$x_new[o], q3c[o], col = 'darkblue', lty = 2, lwd = 3)
+        }
       } else if (ncol(x$x) == 2) {
         if (!requireNamespace("interp", quietly = TRUE)) {
           stop("Package \"interp\" needed for this plot. Please install it.",
@@ -154,10 +165,14 @@ plot.bhomgp <- function(x, trace = NULL, predict = NULL, verb = TRUE,...) {
     if(trace){
       if(!x$settings$sep){
         par(mfrow = c(1, 4), mar = c(5, 4, 2, 2))
-        plot(x$theta_y, type = 'l', lwd = 1, main = "Trace Plot (theta_y)")
-        plot(x$g_y, type = 'l', lwd = 1, main = "Trace Plot (g_y)")
-        plot(x$tau2, type = 'l', lwd = 1, main = "Trace Plot (tau2)")
-        plot(x$llik, type = 'l', lwd = 1, main = "Trace Plot (llik)")
+        plot(x$theta_y, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "theta_y",
+             main = "Trace Plot (theta_y)")
+        plot(x$g_y, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "g_y",
+             main = "Trace Plot (g_y)")
+        plot(x$tau2, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "tau2",
+             main = "Trace Plot (tau2)")
+        plot(x$llik, type = 'l', lwd = 1,  xlab = 'Iteration', ylab = "llik",
+             main = "Trace Plot (llik)")
       }else{
         par(mfrow = c(1, ncol(x$theta_y)), mar = c(5, 4, 2, 2))
         for (i in 1:ncol(x$theta_y))
@@ -180,26 +195,31 @@ plot.bhomgp <- function(x, trace = NULL, predict = NULL, verb = TRUE,...) {
           s2 <- ifel(is.null(x$s2_y), x$s2_y_ci, x$s2_y)
           q1 <- x$mean + qnorm(0.05, 0, sqrt(s2))
           q3 <- x$mean + qnorm(0.95, 0, sqrt(s2))
+          if(!is.null(x$s2_y_ci) & !is.null(x$s2_y)){
+            q1c <- x$mean + qnorm(0.05, 0, sqrt(x$s2_y_ci))
+            q3c <- x$mean + qnorm(0.95, 0, sqrt(x$s2_y_ci))
+          } else q1c <- NULL
         } else {
-          # Sigma_smooth <- x$Sigma - diag(exp(x$mean_lnugs) * mean(x$tau2), nrow(x$x_new))
-          # y_samples <- t(mvtnorm::rmvnorm(50, x$mean, x$Sigma_ci))
-          # y_samples <- x$mean
           sig <- ifel(is.null(x$Sigma), x$Sigma_ci, x$Sigma)
           q1 <- x$mean + qnorm(0.05, 0, sqrt(diag(sig)))
           q3 <- x$mean + qnorm(0.95, 0, sqrt(diag(sig)))
+          if(!is.null(x$Sigma_ci) & !is.null(x$Sigma)){
+            q1c <- x$mean + qnorm(0.05, 0, sqrt(x$Sigma_ci))
+            q3c <- x$mean + qnorm(0.95, 0, sqrt(x$Sigma_ci))
+          } else q1c <- NULL
         }
         o <- order(x$x_new)
-        plot(x$x_new[o], x$mean[o], type = 'l', xlab = 'X', ylab = 'Y', 
-             ylim = c(min(q1), max(q3)),
-             col = 'blue')
-        # if (!is.null(x$Sigma_ci)) {
-        #   matlines(x$x_new[o], y_samples[o,], col = 'lightblue', lty = 1)
-        #   lines(x$x_new[o], x$mean[o], col = 'blue')
-        # }
-        lines(x$x_new[o], q1[o], col = 'blue', lty = 2)
-        lines(x$x_new[o], q3[o], col = 'blue', lty = 2)
-        points(rep(x$x, x$A), unlist(x$Ylist), pch = 20, col = "gray")
+ 
+        plot(rep(x$x, x$A), unlist(x$Ylist), pch = 1, col = "gray",
+               xlab = 'X', ylab = 'Y', ylim = c(min(q1), max(q3)))
         points(x$x, x$y, pch = 20)
+        lines(x$x_new[o], x$mean[o], col = 'blue', lwd = 1)
+        lines(x$x_new[o], q1[o], col = 'blue', lty = 2, lwd = 1)
+        lines(x$x_new[o], q3[o], col = 'blue', lty = 2, lwd = 1)
+        if(!is.null(q1c)){
+          lines(x$x_new[o], q1c[o], col = 'darkblue', lty = 2, lwd = 3)
+          lines(x$x_new[o], q3c[o], col = 'darkblue', lty = 2, lwd = 3)
+        }
       } else if (ncol(x$x) == 2) {
         if (!requireNamespace("interp", quietly = TRUE)) {
           stop("Package \"interp\" needed for this plot. Please install it.",

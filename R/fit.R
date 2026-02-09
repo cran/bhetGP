@@ -73,7 +73,7 @@
 #'     \code{vecchia = FALSE} and Scaled-Vecchia with Stochastic Kriging (Sk-Vec)
 #'     hybrid approach if \code{vecchia = TRUE}.
 #'     
-#'     For SK-Vec hybrid approach, scaled Vecchia code from 
+#'     For SK-Vec hybrid approach, code appropriated from 
 #'     \url{https://github.com/katzfuss-group/scaledVecchia/blob/master/vecchia_scaled.R}
 #'     is used to fit two GPs using the Vecchia approximation. The first for (x, y) pairs,
 #'     which result in estimated residual sums of squares 
@@ -208,7 +208,7 @@
 #' # Trimming the object to remove burn in and thin samples
 #' fit <- trim(fit, 50, 10)
 #' 
-#' # Predition using the bhetGP object (indepedent predictions)
+#' # Prediction using the bhetGP object (independent predictions)
 #' fit <- predict(fit, xx, cores = 2) 
 #' 
 #' # Visualizing the mean predictive surface. 
@@ -226,7 +226,7 @@
 #' # Trimming the object to remove burn in and thin samples
 #' fit <- trim(fit, 50, 10)
 #' 
-#' # Predition using the bhetGP_vec object with joint predictions (lite = FALSE)
+#' # Prediction using the bhetGP_vec object with joint predictions (lite = FALSE)
 #' # Two cores for OpenMP, default setting (omp_cores = 2). No SNOW
 #' fit <- predict(fit, xx, lite = FALSE, vecchia = TRUE) 
 #'
@@ -244,7 +244,7 @@
 #' # Trimming the object to remove burn in and thin samples
 #' fit <- trim(fit, 100, 10)
 #'
-#' # Predition using the bhetGP object with joint predictions (lite = FALSE)
+#' # Prediction using the bhetGP object with joint predictions (lite = FALSE)
 #' # Two cores for OpenMP which is default setting (omp_cores = 2)
 #' # Two cores for SNOW (cores = 2)
 #' fit <- predict(fit, xx, vecchia = FALSE, cores = 2, lite = FALSE)
@@ -338,7 +338,9 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
     
     if (nmcmc == 1) {
       out <- c(out, initial)
+      out$llam_samples <- matrix(initial$llam, nrow = 1)
       out$time <- proc.time()[[3]] - tic
+      class(out) <- "bhetgp"
       return(out)
     }
     
@@ -375,7 +377,9 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
     
     if (nmcmc == 1) {
       out <- c(out, initial)
+      out$llam_samples <- matrix(initial$llam, nrow = 1)
       out$time <- proc.time()[[3]] - tic
+      class(out) <- "bhetgp_vec"
       return(out)
     }
     
@@ -455,7 +459,7 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
 #'     leverages mleHomGP for initial values of hyper-parameters if 
 #'     \code{vecchia = FALSE} and scaled vecchia approach if \code{vecchia = TRUE}.
 #'     
-#'     For scaled Vecchia code from 
+#'     For SK-Vec hybrid approach, code appropriated from 
 #'     \url{https://github.com/katzfuss-group/scaledVecchia/blob/master/vecchia_scaled.R}
 #'     is used to fit a vecchia approximated GP to (x, y). A script is leveraged
 #'     internally within this package that fits this method. 
@@ -562,7 +566,7 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
 #' # Trimming the object to remove burn in and thin samples
 #' fit <- trim(fit, 50, 10)
 #' 
-#' # Predition using the bhomGP object (indepedent predictions)
+#' # Prediction using the bhomGP object (independent predictions)
 #' fit <- predict(fit, xx, lite = TRUE, cores = 2)
 #' 
 #' #' # Visualizing the mean predictive surface. 
@@ -579,7 +583,7 @@ bhetGP <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
 #' # Trimming the object to remove burn in and thin samples
 #' fit <- trim(fit, 50, 10)
 #' 
-#' # Predition using the bhomGP_vec object with Vecchia (indepedent predictions)
+#' # Prediction using the bhomGP_vec object with Vecchia (independent predictions)
 #' fit <- predict(fit, xx, vecchia = TRUE, cores = 2)
 #' 
 #' # Visualizing the mean predictive surface.
@@ -668,6 +672,7 @@ bhomGP <- function(x = NULL, y = NULL, reps_list = NULL,
     if (nmcmc == 1) {
       out <- c(out, initial)
       out$time <- proc.time()[[3]] - tic
+      class(out) <- "bhomgp"
       return(out)
     }
     
@@ -701,6 +706,7 @@ bhomGP <- function(x = NULL, y = NULL, reps_list = NULL,
     if (nmcmc == 1) {
       out <- c(out, initial)
       out$time <- proc.time()[[3]] - tic
+      class(out) <- "bhomgp_vec"
       return(out)
     }
     
@@ -720,17 +726,189 @@ bhomGP <- function(x = NULL, y = NULL, reps_list = NULL,
   return(out)
 }
 
-
-bhetGP_vdims <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000, D = ifelse(is.matrix(x), ncol(x), 1),
+# bhetGP vdims  ---------------------------------------------------------------
+#' @title MCMC sampling for Heteroskedastic GP with variance changing 
+#'        in a subset of dimensions
+#' @description Conducts MCMC sampling of hyperparameters and latent noise 
+#'     process \code{llam} for a hetGP. Separate length scale 
+#'     parameters \code{theta_lam} and \code{theta_y} govern the correlation 
+#'     strength of the hidden layer and outer layer respectively.  
+#'     \code{lam} layer may have a non-zero nugget \code{g} which governs 
+#'     noise for the latent noise layer. \code{tau2_y} and \code{tau2_lam}
+#'     control the amplitude of the mean and noise process respectively.
+#'    In Matern covariance, \code{v} governs smoothness.
+#'     
+#' @details Maps inputs \code{x} to mean response \code{y} and noise levels
+#'     \code{llam}. Noise levels vary with subset \code{vdims} dimensions wihtin
+#'     \code{x}. Conducts sampling of the latent noise process using Elliptical 
+#'     Slice sampling.  Utilizes Metropolis Hastings sampling of the length 
+#'     scale and nugget parameters with proposals and priors controlled by 
+#'     \code{priors}. \code{g} for the noise process is set to a specific 
+#'     value, and by default, is not estimated.  When \code{vecchia = TRUE}, 
+#'     all calculations leverage the Vecchia approximation with 
+#'     specified conditioning set size \code{m}. \code{tau2_y} is always 
+#'     inferred from likelihood; \code{tau2_lam} is inferred by default but 
+#'     may be pre-specified and fixed.
+#'     
+#'     NOTE on OpenMP: The Vecchia implementation relies on OpenMP parallelization
+#'     for efficient computation.  This function will produce a warning message 
+#'     if the package was installed without OpenMP (this is the default for 
+#'     CRAN packages installed on Apple machines).  To set up OpenMP 
+#'     parallelization, download the package source code and install 
+#'     using the gcc/g++ compiler.    
+#'     
+#'     Proposals for \code{g} and \code{theta} follow a uniform sliding window 
+#'     scheme, e.g. 
+#'     
+#'     \code{theta_star <- runif(1, l * theta_t / u, u * theta_t / l)}, 
+#'     
+#'     with defaults \code{l = 1} and \code{u = 2} provided in \code{priors}.
+#'     To adjust these, set \code{priors = list(l = new_l, u = new_u)}.    
+#'     Priors on \code{g}, \code{theta_y}, and \code{theta_lam} follow Gamma 
+#'     distributions with shape parameters (\code{alpha}) and rate parameters 
+#'     (\code{beta}) controlled within the \code{priors} list object.  
+#'     Defaults are
+#'     \itemize{
+#'         \item \code{priors$alpha$theta_lam <- 1.5}
+#'         \item \code{priors$beta$theta_lam <- 4}
+#'         \item \code{priors$alpha$theta_y <- 1.5}
+#'         \item \code{priors$beta$theta_y <- 4}
+#'         \item \code{priors$alpha$g <- 1.5}
+#'         \item \code{priors$beta$g <- 4}
+#'     }
+#'     
+#'     \code{tau2_y} and \code{tau2_lam} are not sampled; rather directly inferred
+#'     under conjugate Inverse Gamma prior with shape (\code{alpha}) and scale 
+#'     parameters (\code{beta}) within the \code{priors} list object
+#'     \itemize{       
+#'         \item \code{priors$a$tau2_y <- 10}
+#'         \item \code{priors$a$tau2_y <- 4}
+#'         \item \code{priors$a$tau2_lam <- 10}
+#'         \item \code{priors$a$tau2_lam <- 4}
+#'     }
+#'     These priors are designed for \code{x} scaled to 
+#'     [0, 1] and \code{y} having mean \code{mean_y}.  These may be 
+#'     adjusted using the \code{priors} input.
+#'     
+#'     Initial values for \code{theta_y}, \code{theta_lam}, \code{llam} may be
+#'     specified by the user. If no initial values are specified, \code{stratergy}
+#'     will determine the initialization method. \code{stratergy = "default"} 
+#'     leverages mleHetGP for initial values of hyper-parameters if 
+#'     \code{vecchia = FALSE} and Scaled-Vecchia with Stochastic Kriging (Sk-Vec)
+#'     hybrid approach if \code{vecchia = TRUE}.
+#'     
+#'     For SK-Vec hybrid approach, code appropriated from
+#'     \url{https://github.com/katzfuss-group/scaledVecchia/blob/master/vecchia_scaled.R}
+#'     is used to fit two GPs using the Vecchia approximation. The first for (x, y) pairs,
+#'     which result in estimated residual sums of squares 
+#'     based on predicted y values. Another GP on (x[, vdims], s) to obtain
+#'     latent noise estimates which are smoothed.  A script is leveraged
+#'     internally within this package that fits this method. 
+#'     
+#'     Optionally, choose stratergy = "flat" which which will start at 
+#'     uninformative initial values; \code{llam} = log(var(y) * 0.1) or
+#'     specify initial values. 
+#'     
+#'     The output object of class \code{bhetgp} or \code{bhetgp_vec} is designed for 
+#'     use with \code{trim}, \code{predict}, and \code{plot}.   
+#'
+#' @param x vector or matrix of input locations
+#' @param y vector of response values
+#' @param reps_list list object from hetGP::find_reps 
+#' @param nmcmc number of MCMC iterations
+#' 
+#' @param sep logical indicating whether to fit isotropic GP (\code{sep = FALSE})
+#'            or seperable GP (\code{sep = TRUE})
+#' @param inits set initial values for hyparameters: \code{llam}, \code{theta_y}, 
+#'              \code{theta_lam}, \code{g}, \code{mean_y}, \code{mean_lam},
+#'              \code{scale_y}, \code{scale_lam}.
+#'              Additionally, set initial conditions for tuning:
+#'              \itemize{ 
+#'                \item \code{theta_check}: logical; if \code{theta_check = TRUE},
+#'                then ensures that theta_lam > theta_y i.e., decay of correlation
+#'                for noise process is slower than mean process.
+#'                \item \code{prof_ll_lam}: logical; if \code{prof_ll_lam = TRUE},
+#'                infers tau2_lam i.e., scale parameter for latent noise process
+#'                \item \code{noise}: logical; if \code{noise = TRUE}, infers nugget
+#'                \code{g} throught M-H for latent noise process.
+#'              }
+#' @param priors hyperparameters for priors and proposals (see details)
+#' @param reps logical; if \code{reps = TRUE} uses Woodbury inference adjusting for
+#'             replication of design points and \code{reps = FALSE} does not
+#'             use Woodbury inference
+#' @param cov covariance kernel, either Matern, ARD Matern 
+#'        or squared exponential (\code{"exp2"})
+#' @param vdims vector of dimension index within which noise changes
+#' @param stratergy choose initialization stratergy; "default" uses hetGP for 
+#'        \code{vecchia = FALSE} settings and sVecchia for \code{vecchia = TRUE}. 
+#'        See details.
+#' @param v Matern smoothness parameter (only used if \code{cov = "matern"})
+#' @param vecchia logical indicating whether to use Vecchia approximation
+#' @param vecchia_var logical indicating whether to use Vecchia approximation for
+#'        noise process
+#' @param m size of Vecchia conditioning sets (only used if 
+#'        \code{vecchia = TRUE})
+#' @param ordering optional ordering for Vecchia approximation, must correspond
+#'        to rows of \code{x}, defaults to random, is applied to \code{x} (only used if 
+#'        \code{vecchia = TRUE})
+#' @param verb logical indicating whether to print progress
+#' @param omp_cores logical; if \code{vecchia = TRUE}, user may specify the number of cores to
+#'        use for OpenMP parallelization. Uses min(4, limit) where limit is max openMP 
+#'        cores available on the machine.
+#' @return a list of the S3 class \code{bhetgp} or \code{bhetgp_vec} with elements:
+#' \itemize{
+#'   \item \code{x}: copy of input matrix
+#'   \item \code{y}: copy of response mean at inputs (x)
+#'   \item \code{Ylist}: list of all responses observed per location (x)
+#'   \item \code{A}: number of replicates at each location
+#'   \item \code{nmcmc}: number of MCMC iterations
+#'   \item \code{priors}: copy of proposal/priors
+#'   \item \code{settings}: setting for predictions using \code{bhetgp} or \code{bhetgp_vec}
+#'   object
+#'   \item \code{theta_y}: vector of MCMC samples for \code{theta_y} (length
+#'         scale of mean process)
+#'   \item \code{theta_lam}: matrix of MCMC samples for \code{theta_lam} (length 
+#'         scale of latent noise process)
+#'   \item \code{llam_samples}: matrix of ESS samples for \code{log lambda} (latent 
+#'   noise process samples)
+#'   \item \code{g}: vector of MCMC samples for \code{g} if infered
+#'   \item \code{tau2}: vector of MAP estimates for \code{tau2} (scale 
+#'         parameter of mean process)
+#'   \item \code{tau2_lam}: vector of MAP estimates for \code{tau2_lam} (scale 
+#'         parameter of latent noise process)
+#'   \item \code{llik_y}: vector of MVN log likelihood of Y for reach Gibbs iteration
+#'   \item \code{llik_lam}: vector of MVN log likelihood of \code{llam} i.e.
+#'              the latent noise process for reach Gibbs iteration
+#'   \item \code{x_approx}: conditioning set, NN and ordering for \code{vecchia = TRUE}
+#'   \item \code{m}: copy of size of conditioning set for \code{vecchia = TRUE}            
+#'   \item \code{time}: computation time in seconds
+#'   
+#' }
+#' 
+#' @references
+#' 
+#' Binois, Mickael, Robert B. Gramacy, and Mike Ludkovski. "Practical heteroscedastic Gaussian process 
+#' modeling for large simulation experiments." Journal of Computational and Graphical 
+#' Statistics 27.4 (2018): 808-821.
+#' 
+#' Katzfuss, Matthias, Joseph Guinness, and Earl Lawrence. "Scaled Vecchia approximation for 
+#' fast computer-model emulation." SIAM/ASA Journal on Uncertainty Quantification 10.2 (2022): 537-554.
+#' 
+#' Sauer, Annie Elizabeth. "Deep Gaussian process surrogates for computer experiments." (2023).
+bhetGP_vdims <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000,
                    sep = TRUE, inits = NULL, # ls_check = FALSE,
                    priors = NULL, reps = TRUE,
                    vdims = NULL, # does variance change in all dims
                    cov = c("exp2", "matern", "ARD matern"), v = 2.5, 
                    stratergy = c("default", "flat"), vecchia = FALSE,
-                   m = min(25, length(y) - 1), ordering = NULL, verb = TRUE, omp_cores = 4){
+                   m = min(25, length(y) - 1), ordering = NULL, verb = TRUE, 
+                   omp_cores = 4, vecchia_var = FALSE){
   
   tic <- proc.time()[[3]]
   cov <- match.arg(cov)
+  stratergy <- match.arg(stratergy)
+  
+  D = ifelse(is.matrix(x), ncol(x), 1)
 
   if (cov == "exp2") v <- 999 # indicator
   if (!vecchia & length(y) > 300)
@@ -780,12 +958,12 @@ bhetGP_vdims <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000, D =
   }
   
   # check prior settings
-  priors <- check_settings(priors, gp_type = "hetgp", x = Xn, y = Yn)
+  priors <- check_settings(priors, gp_type = "hetgpv", x = Xn, y = Yn, vdims = vdims)
   
   if(is.null(inits$mean_y)) inits$mean_y <- mean(y)
   initial <- list(theta_y = inits$theta_y_0, theta_lam = inits$theta_lam_0, g = inits$g_0,
                   llam = inits$llam_0, mean_y =inits$mean_y , mean_lam = inits$mean_lam,
-                  scale_lam = inits$scale_lam, scale_y = inits$scale_y, theta_check = inits$ls_check,
+                  scale_lam = inits$scale_lam, scale_y = 1, theta_check = inits$ls_check,
                   prof_ll_lam = inits$prof_ll_lam, noise = inits$noise)
   
   initial <- check_inits_vdims(reps = ifel(is.null(reps), hetGP::find_reps(x, y), reps), 
@@ -795,17 +973,24 @@ bhetGP_vdims <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000, D =
                                v = v, stratergy = stratergy, vec = vecchia, verb = verb)
   
   settings <- list(v = v, vdims = vdims, sep = sep, mean_y = initial$mean_y,
-                   mean_lam = initial$mean_lam)
+                   mean_lam = initial$mean_lam, verb = verb)
   
   mappings <- list(reps_vdims = reps_vdims) # store mappings for predictions
   
   out <- list(x = Xn, y = Yn, Ylist = reps$Zlist, A = reps$mult, nmcmc = nmcmc, 
-              priors = priors, settings = settings)
+              priors = priors, settings = settings, mappings = mappings)
   
   if(!vecchia){ # non vecchia
-    initial <- check_scale_vdims(x = xv, v = v, init = initial, vec = FALSE, sep = sep)
+    initial <- check_scale(x = xv, v = v, vec = FALSE, priors = priors, init = initial, vdims = TRUE)
+    calc <- precalc(Xn, out = Yn, outs2 = YNs2, A = A, v, vec = FALSE, priors, initial, 
+                    latent = FALSE, vdims = TRUE)
+    initial$llik_y <- calc$llik
+    initial$tau2_y <- calc$tau2
+    
     if (nmcmc == 1) {
       out <- c(out, initial)
+      out$llam_samples <- matrix(initial$llam, nrow = 1)
+      class(out) <- "bhetgp"
       return(out)
     }
     if(verb) print("starting mcmc")
@@ -835,23 +1020,49 @@ bhetGP_vdims <- function(x = NULL, y = NULL, reps_list = NULL, nmcmc = 1000, D =
     Yn_ord <- Yn[x_approx$ord] # order Yn
     out$x_approx <- x_approx # store approximation
     
-    initial <- check_scale_vdims(x = x_approx, v = v, init = initial, vec = TRUE, sep = sep)
+    # Check if vecchia needed for variance layer
+    if(!is.null(reps)){
+      if(nrow(xv) > 300 & vecchia_var) {
+        message("vecchia for variance layer")
+        vecchia_var <- TRUE
+        out$xv_approx <- xv_approx <- create_approx(xv, x_approx$m, cores = x_approx$n_cores)
+        initial <- check_scale(x = xv_approx, v = v, vec = TRUE, priors = priors, init = initial, 
+                               vdims = TRUE, vd = vdims)
+      } else{
+        vecchia_var <- FALSE
+        xv_approx <- NULL
+        initial <- check_scale(x = xv, v = v, vec = FALSE, priors = priors, init = initial, vdims = TRUE)
+      }
+    }
+    else{
+      initial <- check_scale(x = x_approx, v = v, vec = FALSE, priors = priors, init = initial, vdims = TRUE)
+    }
+    
+    calc <- precalc(x_approx, out = Yn_ord, outs2 = YNs2_ord, A = A, v, vec = TRUE, priors, initial, 
+                    latent = FALSE, vdims = TRUE)
+    initial$llik_y <- calc$llik
+    initial$tau2_y <- calc$tau2
+    
     if (nmcmc == 1) {
       out <- c(out, initial)
+      out$llam_samples <- matrix(initial$llam, nrow = 1)
+      class(out) <- "bhetgp-vec"
       return(out)
     }
     if(verb) print("starting mcmc")
     if(is.null(reps)){ # if no reps
-      if(sep) obj <- gibbs_sep_vdims_N_vec(Yn = Yn_ord,  x_approx, nmcmc,  initial, 
+      if(sep) obj <- gibbs_sep_vdims_N_vec(Yn = Yn_ord, x_approx, nmcmc,  initial, 
                                            priors = priors, v, vdims = vdims, verb = verb)
       else obj <- gibbs_iso_vdims_N_vec(Yn = Yn_ord,  x_approx, nmcmc, initial, 
                                         priors = priors, v, vdims = vdims, verb = verb)
     }
     else{ # if reps (woodbury)
-      if(sep) obj <- gibbs_sep_vdims_vec(YNs2_ord, Yn_ord, x_approx, xv, reps$mult, vdims = vdims, nmcmc,
-                                         initial, priors = priors, v = v, reps_vdims, verb = verb)
-      else obj <- gibbs_iso_vdims_vec(YNs2_ord, Yn_ord, x_approx, xv, reps$mult, vdims = vdims, nmcmc,
-                                      initial, priors = priors, v = v, reps_vdims, verb = verb)
+      if(sep) obj <- gibbs_sep_vdims_vec(YNs2_ord, Yn_ord, x_approx, A = reps$mult, vdims = vdims, nmcmc,
+                                         initial, priors = priors, v = v, reps_vdims, 
+                                         xv_approx = xv_approx, vecchia_var = vecchia_var, verb = verb)
+      else obj <- gibbs_iso_vdims_vec(YNs2_ord, Yn_ord, x_approx, A = reps$mult, vdims = vdims, nmcmc,
+                                      initial, priors = priors, v = v, reps_vdims, 
+                                      xv_approx = xv_approx, vecchia_var = vecchia_var, verb = verb)
     }
   }
   

@@ -97,7 +97,7 @@ arma::mat U_entries_Hom (const int Ncores, const arma::mat& x, const arma::umat&
       arma::vec onevec = zeros(n0);
       onevec[n0 - 1] = 1;
       arma::vec M = solve(chol(covmat, "upper"), onevec);
-      Lentries(k, span(0, n0 - 1)) = M.t();
+      Lentries(k, arma::span(0, n0 - 1)) = M.t();
     }
     
   #else
@@ -116,7 +116,7 @@ arma::mat U_entries_Hom (const int Ncores, const arma::mat& x, const arma::umat&
       arma::vec onevec = zeros(n0);
       onevec[n0 - 1] = 1;
       arma::vec M = solve(chol(covmat, "upper"), onevec);
-      Lentries(k, span(0, n0 - 1)) = M.t();
+      Lentries(k, arma::span(0, n0 - 1)) = M.t();
     }
     
   #endif
@@ -152,7 +152,7 @@ arma::mat U_entries(const int Ncores, const arma::mat& x, const arma::umat& revN
     arma::vec onevec = zeros(n0);
     onevec[n0 - 1] = 1;
     arma::vec M = solve(chol(covmat, "upper"), onevec);
-    Lentries(k, span(0, n0 - 1)) = M.t();
+    Lentries(k, arma::span(0, n0 - 1)) = M.t();
   }
   
 #else
@@ -173,7 +173,7 @@ arma::mat U_entries(const int Ncores, const arma::mat& x, const arma::umat& revN
     onevec[n0 - 1] = 1; // last element = 1
     arma::vec M = solve(chol(covmat, "upper"), onevec); // cholesky decomposition of covmat
     // solve system of equations // diagonals get used
-    Lentries(k, span(0, n0 - 1)) = M.t(); //stores solution?
+    Lentries(k, arma::span(0, n0 - 1)) = M.t(); //stores solution?
   }
   
 #endif
@@ -208,7 +208,7 @@ arma::mat U_entries_sep_Hom (const int Ncores, const arma::mat& x, const arma::u
       arma::vec onevec = zeros(n0);
       onevec[n0 - 1] = 1;
       arma::vec M = solve(chol(covmat, "upper"), onevec);
-      Lentries(k, span(0, n0 - 1)) = M.t();
+      Lentries(k, arma::span(0, n0 - 1)) = M.t();
     }
     
   #else
@@ -228,7 +228,7 @@ arma::mat U_entries_sep_Hom (const int Ncores, const arma::mat& x, const arma::u
       arma::vec onevec = zeros(n0);
       onevec[n0 - 1] = 1;
       arma::vec M = solve(chol(covmat, "upper"), onevec);
-      Lentries(k, span(0, n0 - 1)) = M.t();
+      Lentries(k, arma::span(0, n0 - 1)) = M.t();
     }
     
   #endif
@@ -263,7 +263,7 @@ arma::mat U_entries_sep (const int Ncores, const arma::mat& x, const arma::umat&
     arma::vec onevec = zeros(n0);
     onevec[n0 - 1] = 1;
     arma::vec M = solve(chol(covmat, "upper"), onevec);
-    Lentries(k, span(0, n0 - 1)) = M.t();
+    Lentries(k, arma::span(0, n0 - 1)) = M.t();
   }
   
 #else
@@ -283,7 +283,7 @@ arma::mat U_entries_sep (const int Ncores, const arma::mat& x, const arma::umat&
     arma::vec onevec = zeros(n0);
     onevec[n0 - 1] = 1;
     arma::vec M = solve(chol(covmat, "upper"), onevec);
-    Lentries(k, span(0, n0 - 1)) = M.t();
+    Lentries(k, arma::span(0, n0 - 1)) = M.t();
   }
   
 #endif

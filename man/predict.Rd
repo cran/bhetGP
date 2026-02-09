@@ -14,7 +14,7 @@
   lite = TRUE,
   return_all = FALSE,
   interval = c("pi", "ci", "both"),
-  lam_ub = TRUE,
+  lam_quan = NULL,
   cores = 1,
   samples = TRUE,
   ...
@@ -26,7 +26,7 @@
   lite = TRUE,
   return_all = FALSE,
   interval = c("pi", "ci", "both"),
-  lam_ub = TRUE,
+  lam_quan = NULL,
   vecchia = FALSE,
   m = object$m,
   ordering_new = NULL,
@@ -79,8 +79,8 @@ variance prediction for ALL samples (only available for \code{lite = TRUE})}
 \code{interval = "ci"} returns variances for only mean process and 
 \code{interval = "both"} returns both variances.}
 
-\item{lam_ub}{logical uses upper 95 quantile for latent noise to 
-obtain predictive variances for the response. If \code{lam_ub = FALSE},
+\item{lam_quan}{if specified uses upper \code{lam_quan} quantile for latent noise to 
+obtain predictive variances for the response. If \code{lam_quan = NULL},
 the mean latent noise is used for inference.}
 
 \item{cores}{number of cores to utilize for SNOW parallelization}

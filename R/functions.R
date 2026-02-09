@@ -26,18 +26,18 @@ loglw <- function(ys2, yn, xn, nugs, A, v, theta, outer = TRUE, calc_tau2 = TRUE
     Kn <- MaternSepVec(xn, xn, tau2 = scale, theta = theta, g = lam_adj, v= v)
   }
   
-  Kinv <- solve(Kn)
+  # Kinv <- solve(Kn)
+  Kinv <- invdet(Kn)
   # if(mean != 0) mean <- drop(rowSums(Kinv) %*% yn/(sum(Kinv))) # 1t Kn(-1) Delta (1t Kn(-1) 1) ^ (-1)
-  
   # ys2 <- unlist(lapply(yc, function(x) sum((x - mean(x))^2)))
   yn <- yn - mean
   
   N <- sum(A)
   q <- sum(ys2/nugs)
   
-  quadterm <-  q + t(yn) %*% solve(Kn,yn) # woodbury adjusted quad 
+  quadterm <-  q + t(yn) %*% Kinv$Mi %*% yn # solve(Kn,yn) # woodbury adjusted quad 
   
-  logdet <- (-0.5) * determinant(Kn, logarithm=TRUE)$modulus # log (det(Kn)) 
+  logdet <- (-0.5) * Kinv$ldet # determinant(Kn, logarithm=TRUE)$modulus # log (det(Kn)) 
   
   # Adjused linear term
   S <- (-0.5) * sum((A-1) * log(nugs) + log(A))
@@ -74,19 +74,22 @@ logl <- function(y, x, nugs = NULL, theta, v, outer = TRUE, calc_tau2 = TRUE,
     else KN <- MaternSepVec(x, x, tau2 = scale, theta = theta, g = nugs, v= v)
   }
   
-  Kinv <- solve(KN)
+  # Kinv <- solve(KN)
+  Kinv <- invdet(KN)
   N <- length(y)
   
   # if(mean != 0) mean <- drop(rowSums(Kinv) %*% y/(sum(Kinv)))
   y <- y - mean
 
-  quadterm <- (t(y) %*% Kinv %*% y)
+  quadterm <- (t(y) %*% Kinv$Mi %*% y)
   
   # outer for Y layer, False for lambda layer
   if(outer) {
-    llik <- (-0.5 * (N + a)) * log (quadterm + b) - (0.5 * determinant(KN, logarithm=TRUE)$modulus)
+    llik <- (-0.5 * (N + a)) * log (quadterm + b) - 0.5 * Kinv$ldet
+      # (0.5 * determinant(KN, logarithm=TRUE)$modulus)
   }else {
-    llik <- ((-0.5) * determinant(KN, logarithm=TRUE)$modulus) - (0.5) * (quadterm)
+    llik <- (-0.5) * Kinv$ldet - (0.5) * (quadterm)
+      # ((-0.5) * determinant(KN, logarithm=TRUE)$modulus) - (0.5) * (quadterm)
   } 
   
   if(calc_tau2){
@@ -117,14 +120,15 @@ loglw_iso <- function(ys2, yn, dx_n, nugs, A, v, theta, outer = TRUE, calc_tau2 
   N <- sum(A)
   n <- length(yn)
   
-  Kinv <- solve(Kn)
+  # Kinv <- solve(Kn)
+  Kinv <- invdet(Kn)
   # if(mean != 0) mean <- drop(rowSums(Kinv) %*% yn/(sum(Kinv))) # 1t Kn(-1) Delta (1t Kn(-1) 1) ^ (-1)
   yn <- yn - mean
   q <- sum(ys2/nugs)
   
-  quadterm <-  q + t(yn) %*% solve(Kn,yn) 
+  quadterm <-  q + t(yn) %*% Kinv$Mi %*% yn#solve(Kn,yn) 
   
-  logdet <- (-0.5) * determinant(Kn, logarithm=TRUE)$modulus ## log (det(Kn)) 
+  logdet <- (-0.5) * Kinv$ldet # determinant(Kn, logarithm=TRUE)$modulus ## log (det(Kn)) 
   
   S <- (-0.5) * sum((A-1) * log(nugs) + log(A))
   
@@ -154,19 +158,21 @@ logl_iso <- function(y, dx, nugs = NULL, theta, v, outer = TRUE, calc_tau2 = TRU
     else KN <- MaternVec(dx, tau2 = scale, theta = theta, g = nugs, v= v) # hetGP
   }
 
-  Kinv <- solve(KN)
+  # Kinv <- solve(KN)
+  Kinv <- invdet(KN)
   # if(mean != 0) mean <- drop(rowSums(Kinv) %*% y/(sum(Kinv)))
   y <- y - mean
   
   N <- length(y)
-  quadterm <- (t(y) %*% Kinv %*% y)
+  quadterm <- (t(y) %*% Kinv$Mi %*% y)
   
   # outer for Y layer, false for Lam layer
   if(outer) {
-    llik <- (- 0.5 *(N + a)) * log (quadterm + b) - (0.5 * determinant(KN, logarithm=TRUE)$modulus)
-    # llik <- (-N/2) * log (quadterm) - (0.5 * determinant(KN, logarithm=TRUE)$modulus)
+    llik <- (- 0.5 *(N + a)) * log (quadterm + b) - (0.5) * Kinv$ldet
+      # (0.5 * determinant(KN, logarithm=TRUE)$modulus)
   }else{
-    llik <- ((-0.5) * determinant(KN, logarithm=TRUE)$modulus) - (0.5) * (quadterm)
+    # llik <- ((-0.5) * determinant(KN, logarithm=TRUE)$modulus) - (0.5) * (quadterm)
+    llik <- (-0.5) * Kinv$ldet - (0.5) * (quadterm)
   }
   
   if(calc_tau2) {
@@ -316,7 +322,8 @@ loglw_N <- function(y, yn, xn, nugs, A, v, theta, outer = TRUE, calc_tau2 = TRUE
     Kn <- MaternSepVec(xn, xn, tau2 = scale, theta = theta, g = lam_adj, v= v)
   }
   
-  Kinv <- solve(Kn)
+  # Kinv <- solve(Kn)
+  Kinv <- invdet(Kn)
   # if(mean != 0) mean <- drop(rowSums(Kinv) %*% yn/(sum(Kinv))) # 1t Kn(-1) Delta (1t Kn(-1) 1) ^ (-1)
   
   y <- y - mean
@@ -326,9 +333,9 @@ loglw_N <- function(y, yn, xn, nugs, A, v, theta, outer = TRUE, calc_tau2 = TRUE
   q1 <- sum(y^2 /lamN) # Y(N)t * Lam(N) ^ (-1) * Y(N)
   q2 <- sum(yn^2 * A/nugs) # Y(n)t * Lam(n) ^ (-1) * Y(n)
   
-  quadterm <-  q1 - q2 + t(yn) %*% solve(Kn,yn) # woodbury adjusted quad 
-  
-  logdet <- (-0.5) * determinant(Kn, logarithm=TRUE)$modulus # log (det(Kn)) 
+  quadterm <-  q1 - q2 + t(yn) %*% Kinv$Mi %*% yn #solve(Kn, yn) # woodbury adjusted quad 
+   
+  logdet <- (-0.5) * Kinv$ldet #determinant(Kn, logarithm=TRUE)$modulus # log (det(Kn)) 
   
   # Adjused linear term
   S <- (-0.5) * sum((A-1) * log(nugs) + log(A))
@@ -417,17 +424,18 @@ loglw_iso_N <- function(y, yn, dx_n, nugs, A, v, theta, outer = TRUE, calc_tau2 
   N <- length(y)
   n <- length(yn)
   
-  Kinv <- solve(Kn)
+  # Kinv <- solve(Kn)
+  Kinv <- invdet(Kn)
   # if(mean != 0) mean <- drop(rowSums(Kinv) %*% yn/(sum(Kinv))) # 1t Kn(-1) Delta (1t Kn(-1) 1) ^ (-1)
-  y <- y -mean
+  y <- y - mean
   yn <- yn - mean
   
   q1 <- sum(y^2 /lamN)  # Y(N)t * Lam(N) ^ (-1) * Y(N)
   q2 <- sum(yn^2 * A/nugs) # Y(n)t * Lam(n) ^ (-1) * Y(n)
   
-  quadterm <-  q1 - q2 + t(yn) %*% solve(Kn,yn) 
+  quadterm <-  q1 - q2 + t(yn) %*% Kinv$Mi %*% yn#solve(Kn,yn) 
   
-  logdet <- (-0.5) * determinant(Kn, logarithm=TRUE)$modulus ## log (det(Kn)) 
+  logdet <- (-0.5) * Kinv$ldet#determinant(Kn, logarithm=TRUE)$modulus ## log (det(Kn)) 
   
   S <- (-0.5) * sum((A-1) * log(nugs) + log(A))
   

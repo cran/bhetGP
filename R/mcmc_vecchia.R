@@ -1,4 +1,3 @@
-# ----------------------  MCMC HomGP + HetGP Vecchia ---------------------------
 
 # ------- HetGP Vecchia --------------------------------------------------------
 # ess_sample_vec: ESS sampling for Lambda layer w/ vecchia
@@ -54,7 +53,10 @@ ess_sample_vec <- function(YNs2 = NULL, yn, x_approx, llam_prev, A, llik_prev = 
     
     # New log-lambda 
     llam_new <- llam_prev * cos (gam) + llam_prior * sin (gam)
-    
+    # if(max(llam_new) > 7) {
+    #   gam <- runif(1,gam_min, gam_max)
+    #   next
+    # }
     # l_new <- exp(llam_new)
     # l_new[l_new == 0] <- 1e-8
     
@@ -108,12 +110,12 @@ mcmc_theta_y_sep_vec <- function(YNs2= NULL, yn= NULL, x_approx, A= NULL, index,
       llik_prev <- obj_prev$llik
       tau2_prev <- obj_prev$tau2
     }
-    # else{
-    #   obj_prev <- loglw_vec(YNs2, yn, x_approx, A, exp(llam_prev), theta = theta_prev, outer = outer, v = v,
-    #                         calc_tau2 = calc_tau2, sep = TRUE, mean = mean, scale = scale, a= a, b = b)
-    #   if(abs(llik_prev - obj_prev$llik) > 1e-8) stop('llik mismatch')
-    #   if(abs(tau2_prev - obj_prev$tau2) > 1e-8) stop("tau2 mismatch")
-    # }
+    else{
+      obj_prev <- loglw_vec(YNs2, yn, x_approx, A, exp(llam_prev), theta = theta_prev, outer = outer, v = v,
+                            calc_tau2 = calc_tau2, sep = TRUE, mean = mean, scale = scale, a= a, b = b)
+      # if(abs(llik_prev - obj_prev$llik) > 1e-8) stop('llik mismatch')
+      # if(abs(tau2_prev - obj_prev$tau2) > 1e-8) stop("tau2 mismatch")
+    }
     obj_prop <- loglw_vec(YNs2, yn, x_approx, A, exp(llam_prev), theta = theta_star, outer = outer, v = v, 
                           calc_tau2 = calc_tau2, sep = TRUE, mean = mean, scale = scale, a= a, b = b)
     llik_prop <- obj_prop$llik
@@ -167,13 +169,13 @@ mcmc_theta_l_sep_vec <- function(x_approx, llam_prev, index, theta_prev, llik_pr
     llik_prev <- obj_prev$llik
     tau2_prev <- obj_prev$tau2
   }
-  # else{
-  #   obj_prev <- logl_vec(llam_prev, x_approx, nugs= g0, theta = theta_prev, outer = inner, v= v, 
-  #                        calc_tau2 = calc_inner_tau2, sep = TRUE, mean = mean0, 
-  #                        scale = scale0, a = a0, b = b0, latent = T)
-  #   if(abs(llik_prev - obj_prev$llik) > 1e-8) stop('llik mismatch')
-  #   if(abs(tau2_prev - obj_prev$tau2) > 1e-8) stop("tau2 mismatch")
-  # }
+  else{
+    obj_prev <- logl_vec(llam_prev, x_approx, nugs= g0, theta = theta_prev, outer = inner, v= v,
+                         calc_tau2 = calc_inner_tau2, sep = TRUE, mean = mean0,
+                         scale = scale0, a = a0, b = b0, latent = T)
+    # if(abs(llik_prev - obj_prev$llik) > 1e-8) stop('llik mismatch')
+    # if(abs(tau2_prev - obj_prev$tau2) > 1e-8) stop("tau2 mismatch")
+  }
   obj_prop <- logl_vec(llam_prev, x_approx, nugs= g0, theta = theta_star, outer = inner,
                        v= v, calc_tau2 = calc_inner_tau2, sep = TRUE, mean = mean0, scale = scale0,
                        a = a0, b = b0, latent = TRUE)

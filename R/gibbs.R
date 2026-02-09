@@ -91,7 +91,8 @@ gibbs_sep <- function(YNs2 = NULL, Yn, Xn, A, mcmc, initial, priors, v, verb = T
     llam_draw <- ess_sample(YNs2= YNs2, yn=Yn, xn=Xn, llam_samples[t - 1, ], A = A, llik_prev = llik_y,
                             theta_y = theta_y[t, ], theta_lam = theta_lam[t, ],  sep = TRUE, v = v, 
                             outer = initial$outer, calc_tau2 = initial$tau2, mean0 = initial$mean_lam, 
-                            scale0 = tau2_lam, g0 = g[t], a = priors$a$tau2_y, b = priors$b$tau2_y,
+                            scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam),
+                            g0 = g[t], a = priors$a$tau2_y, b = priors$b$tau2_y,
                             mean = initial$mean_y, scale = initial$scale_y)
     llam_samples[t, ] <- llam_draw$llam
     llik_y <- llam_draw$llik
@@ -106,7 +107,7 @@ gibbs_sep <- function(YNs2 = NULL, Yn, Xn, A, mcmc, initial, priors, v, verb = T
     llik_y_store[t] <- llik_y
     llik_lam_store[t] <- llik_lam
     
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)     
     tau2_store[t] <- tau2
   }
   
@@ -208,7 +209,7 @@ gibbs_iso <- function(YNs2 = NULL, Yn, Xn, A, v, mcmc, initial, priors, verb = T
     llik_lam_store[t] <- llik_lam
     
     tau2_store[t] <- tau2
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)     
   }
   
   return(list(theta_lam = theta_lam, theta_y = theta_y, llam_samples = llam_samples, g = g,
@@ -308,9 +309,10 @@ gibbs_sep_vdims <- function(YNs2 = NULL, Yn, xm, A, mcmc, initial, priors, v, vd
     
     # Ess for log lam updates
     llam_draw <- ess_sample_vdims(YNs2= YNs2, yn=Yn, xn=xm, vdims = vdims, llam_nv[t - 1, ], A = A,
-                                  theta_y = theta_y[t, ], theta_lam = theta_lam[t, ], sep =T, 
+                                  llik_prev = llik_y, theta_y = theta_y[t, ], theta_lam = theta_lam[t, ], sep =T, 
                                   v = v, outer = initial$outer, calc_tau2 = initial$tau2, 
-                                  scale0 = tau2_lam, g0 = g[t], r0 = reps_vdims,
+                                  scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam), 
+                                  g0 = g[t], r0 = reps_vdims,
                                   a = priors$a$tau2_y, b = priors$b$tau2_y,
                                   mean0 = initial$mean_lam, mean = initial$mean_y, scale = initial$scale_y)
     
@@ -328,7 +330,7 @@ gibbs_sep_vdims <- function(YNs2 = NULL, Yn, xm, A, mcmc, initial, priors, v, vd
     llik_lam_store[t] <- llik_lam
     
     tau2_store[t] <- tau2
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)     
   }
   
   return(list(theta_lam = theta_lam, theta_y = theta_y, llam_samples = llam_nv, g = g,
@@ -421,7 +423,8 @@ gibbs_iso_vdims <- function(YNs2 = NULL, Yn, xm, A, mcmc, initial, priors, v, vd
     llam_draw <- ess_sample_vdims(YNs2= YNs2, yn= Yn, xn= xm, vdims = vdims, llam_nv[t - 1, ], A,
                                   llik_prev = llik_y,  tau2_prev = tau2_lam, theta_y[t, ], theta_lam[t, ], 
                                   sep = FALSE, v = v, outer = initial$outer, calc_tau2 = initial$tau2,
-                                  scale0 = tau2_lam, g0 = g[t], r0 = reps_vdims, dx_n = dxm, dx_lam = dxv, 
+                                  scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam), 
+                                  g0 = g[t], r0 = reps_vdims, dx_n = dxm, dx_lam = dxv, 
                                   mean0 = initial$mean_lam, a = priors$a$tau2_y, b = priors$b$tau2_y,
                                   mean = initial$mean_y, scale = initial$scale_y)
     
@@ -440,7 +443,7 @@ gibbs_iso_vdims <- function(YNs2 = NULL, Yn, xm, A, mcmc, initial, priors, v, vd
     llik_lam_store[t] <- llik_lam
     
     tau2_store[t] <- tau2 
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)     
   }
   
   return(list(theta_lam = theta_lam, theta_y = theta_y, llam_samples = llam_nv, g = g,

@@ -57,7 +57,7 @@ gibbs_sep_vec <- function(YNs2 = NULL, Yn, x_approx, A, mcmc, initial, priors, v
       llik_lam <- obj_lam$llik
       tau2_lam <- obj_lam$tau2
     }
-    
+
     if(initial$noise){
       obj_g <- mcmc_g_vec_inner(llam_samples[t-1, ], x_approx, g[t - 1], llik_prev = llik_lam, 
                                 tau2_prev = tau2_lam, theta = theta_lam[t, ], v = v, outer = initial$inner, 
@@ -91,7 +91,8 @@ gibbs_sep_vec <- function(YNs2 = NULL, Yn, x_approx, A, mcmc, initial, priors, v
                                 llik_prev = llik_y, theta_y = theta_y[t, ], theta_lam = theta_lam[t, ], 
                                 sep = TRUE, v = v, outer = initial$outer, calc_tau2 = initial$tau2, 
                                 mean = initial$mean_y, scale = initial$scale_y, mean0 = initial$mean_lam, 
-                                scale0 = tau2_lam, g0 = g[t], a = priors$a$tau2_y, b = priors$b$tau2_y)
+                                scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam),
+                                g0 = g[t], a = priors$a$tau2_y, b = priors$b$tau2_y)
     
     llam_samples[t, ] <- llam_draw$llam
     llik_y <- llam_draw$llik
@@ -109,7 +110,8 @@ gibbs_sep_vec <- function(YNs2 = NULL, Yn, x_approx, A, mcmc, initial, priors, v
     llik_lam_store[t] <- llik_lam
     
     tau2_store[t] <- tau2
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)
+    
   }
   
   return(list(theta_lam = theta_lam, theta_y = theta_y, llam_samples = llam_samples, g = g,
@@ -170,7 +172,7 @@ gibbs_iso_vec <- function(YNs2 = NULL, Yn, x_approx, A, mcmc,
                                 tau2_prev = tau2_lam, theta = theta_lam[t, ], v = v, outer = initial$inner, 
                                 calc_tau2 = initial$inner_tau2, mean = initial$mean_lam, 
                                 scale = initial$scale_lam, alpha = priors$alpha$g, beta = priors$beta$g + t,
-                                l = priors$l , u = priors$u, a = priors$a$tau2_lam, b = priors$b$tau2_lam, sep = TRUE)
+                                l = priors$l, u = priors$u, a = priors$a$tau2_lam, b = priors$b$tau2_lam, sep = TRUE)
       
       g[t] <- obj_g$g
       llik_lam <- obj_g$llik
@@ -198,7 +200,9 @@ gibbs_iso_vec <- function(YNs2 = NULL, Yn, x_approx, A, mcmc,
                                 llik_prev = llik_y, theta_y = theta_y[t], theta_lam = theta_lam[t], 
                                 sep = FALSE, v= v, outer = initial$outer, calc_tau2 = initial$tau2,
                                 mean = initial$mean_y, scale = initial$scale_y,
-                                mean0 = initial$mean_lam, scale0 = tau2_lam, g0 = g[t],
+                                mean0 = initial$mean_lam, 
+                                scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam),
+                                g0 = g[t],
                                 a = priors$a$tau2_y, b = priors$b$tau2_y)
     
     llam_samples[t, ] <- llam_draw$llam
@@ -216,7 +220,7 @@ gibbs_iso_vec <- function(YNs2 = NULL, Yn, x_approx, A, mcmc,
     llik_y_store[t] <- llik_y
     llik_lam_store[t] <- llik_lam   
     
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)
     tau2_store[t] <- tau2
   }
   
@@ -226,8 +230,9 @@ gibbs_iso_vec <- function(YNs2 = NULL, Yn, x_approx, A, mcmc,
 
 # Change latent arg
 
-gibbs_sep_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc, 
-                                initial, priors, v, reps_vdims, verb = TRUE){
+gibbs_sep_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, A, vdims, mcmc, 
+                                initial, priors, v, reps_vdims, 
+                                xv_approx = NULL, vecchia_var, verb = TRUE){
   
   # initial setup - mean layer
   nm <- nrow(xm_approx$x_ord)
@@ -241,15 +246,6 @@ gibbs_sep_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc,
   N <- sum(A)
   
   # Check if vecchia needed for variance layer
-  if(nv > 300) {
-    message("vecchia for variance layer")
-    vecchia_var <- TRUE
-    xv_approx <- create_approx(xv, xm_approx$m)
-  } else{
-    vecchia_var <- FALSE
-    xv_approx <- NULL
-  } 
-  
   llam_nv <- matrix(nrow = mcmc, ncol = nv)
   theta_y <- matrix(nrow = mcmc, ncol = D)
   theta_lam <- matrix(nrow = mcmc, ncol = d)
@@ -266,20 +262,23 @@ gibbs_sep_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc,
   tau2 <- tau2_store[1] <- initial$tau2_y
   
   if(initial$inner_tau2 & initial$scale_lam != 1) stop("broken") # reset scale for prof ll
-  if(initial$scale_y != 1) stop("broken") # reset scale 
+  if(initial$scale_y != 1) stop("broken") # reset scale
   
   llik_y <- llik_y_store[1] <- initial$llik_y
   llik_lam <- llik_lam_store[1] <- initial$llik_lam
   
+  initial$scale_y <- initial$scale_lam <- 1
+
   g[1] <- initial$g
   
   for (t in 2:mcmc) {
     
     if(t %% 500 == 0 & verb == TRUE) print(t)
+    # if(t %% 10 == 0 ) print(c(t, tau2_lam))
     
     # Map nv unique lambdas to n unique inputs
     llam_n[reps_vdims$Z] <- rep(llam_nv[t - 1, ],  reps_vdims$mult)
-    
+    # if(tau2_lam > 500) stop("check")
     for(i in 1:d){
       
       # theta lam update 
@@ -349,7 +348,8 @@ gibbs_sep_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc,
     llam_draw <- ess_sample_vec_vdims(YNs2, yn = Yn, xm_approx, xv_approx, vdims, llam_nv[t - 1, ], A,
                                       llik_prev = llik_y, theta_y = theta_y[t, ], theta_lam = theta_lam[t, ], 
                                       sep = TRUE, v = v, outer = TRUE, calc_tau2 = TRUE, mean = initial$mean_y, 
-                                      scale = initial$scale_y, mean0 = initial$mean_lam, scale0 = tau2_lam, 
+                                      scale = initial$scale_y, mean0 = initial$mean_lam, 
+                                      scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam), 
                                       g0 = g[t], r0 = reps_vdims, vec_var = vecchia_var,
                                       a = priors$a$tau2_y, b = priors$b$tau2_y)
     
@@ -376,7 +376,7 @@ gibbs_sep_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc,
     llik_lam_store[t] <- llik_lam
     
     tau2_store[t] <- tau2
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)
   }
 
   return(list(theta_lam = theta_lam, theta_y = theta_y, llam_samples = llam_nv, tau2 = tau2_store,
@@ -384,14 +384,14 @@ gibbs_sep_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc,
               llik_lam = llik_lam_store))
 }
 
-gibbs_iso_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc, 
-                                initial, priors, v, reps_vdims, verb = TRUE){
+gibbs_iso_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, A, vdims, mcmc, 
+                                initial, priors, v, reps_vdims, 
+                                xv_approx = NULL, vecchia_var, verb = TRUE){
   
   # Setup - Mean layer
   nm <- nrow(xm_approx$x_ord)
   D <- ncol(xm_approx$x_ord)
   
-  # variance layer
   xv <- reps_vdims$X0
   nv <- nrow(xv)
   d <- length(vdims)
@@ -399,15 +399,7 @@ gibbs_iso_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc,
   N <- sum(A)
   
   # check if vec needed for var layer
-  if(nv > 300) {
-    message("vecchia for variance layer")
-    vecchia_var <- TRUE
-    xv_approx <- create_approx(xv, xm_approx$m)
-  } else {
-    vecchia_var <- FALSE
-    xv_approx <- NULL
-    dxv <- sq_dist(xv)
-  }
+  if(!vecchia_var) dxv <- sq_dist(xv)
   
   llam_nv <- matrix(nrow = mcmc, ncol = nv)
   theta_y <- matrix(nrow = mcmc, ncol = 1)
@@ -418,7 +410,7 @@ gibbs_iso_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc,
   llam_nv[1, ] <- initial$llam_nv
   
   llik_y_store <- llik_lam_store <- tau2_store <- tau2_lam_store <- rep(NA, mcmc)
-  llik_y <- llik_lam  <- obj_y <- obj_lam <- llam_draw  <- NULL
+  llik_y <- llik_lam  <- obj_y <- obj_lam <- llam_draw  <- g <-  NULL
   tau2 <- llam_n <- tau2_lam <- NULL
 
   tau2_lam <- tau2_lam_store[1] <- initial$tau2_lam
@@ -506,8 +498,8 @@ gibbs_iso_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc,
     llam_draw <- ess_sample_vec_vdims(YNs2, yn = Yn, x_approx = xm_approx, xv_approx, vdims, llam_nv[t - 1, ], A,
                                       llik_prev = llik_y, theta_y = theta_y[t], theta_lam = theta_lam[t], 
                                       sep = FALSE, v= v, outer = initial$outer, calc_tau2 = initial$tau2, 
-                                      mean = initial$mean, scale = tau2_lam, mean0 = initial$mean_lam,
-                                      scale0 = initial$scale_lam, g0 = g[t], a = priors$a$tau2_y, 
+                                      mean = initial$mean_y, scale = initial$scale_y, mean0 = initial$mean_lam,
+                                      scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam), g0 = g[t], a = priors$a$tau2_y, 
                                       b = priors$b$tau2_y, r0 = reps_vdims, vec_var = vecchia_var)
     
     llam_nv[t, ] <- llam_draw$llam
@@ -533,7 +525,7 @@ gibbs_iso_vdims_vec <- function(YNs2 = NULL, Yn, xm_approx, xv, A, vdims, mcmc,
     llik_lam_store[t] <- llik_lam
     
     tau2_store[t] <- tau2
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)
   }
   
   return(list(theta_lam = theta_lam, theta_y = theta_y, llam_samples = llam_nv, tau2 = tau2_store, 

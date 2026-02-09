@@ -155,7 +155,7 @@ Maps inputs \code{x} to mean response \code{y}. Utilizes Metropolis Hastings
     leverages mleHomGP for initial values of hyper-parameters if 
     \code{vecchia = FALSE} and scaled vecchia approach if \code{vecchia = TRUE}.
     
-    For scaled Vecchia code from 
+    For SK-Vec hybrid approach, code appropriated from 
     \url{https://github.com/katzfuss-group/scaledVecchia/blob/master/vecchia_scaled.R}
     is used to fit a vecchia approximated GP to (x, y). A script is leveraged
     internally within this package that fits this method. 
@@ -195,7 +195,7 @@ fit <- bhomGP(x, y, nmcmc = 100, verb = FALSE)
 # Trimming the object to remove burn in and thin samples
 fit <- trim(fit, 50, 10)
 
-# Predition using the bhomGP object (indepedent predictions)
+# Prediction using the bhomGP object (independent predictions)
 fit <- predict(fit, xx, lite = TRUE, cores = 2)
 
 #' # Visualizing the mean predictive surface. 
@@ -210,7 +210,7 @@ fit <- bhomGP(x, y, nmcmc = 100, vecchia = TRUE, m = 5, omp_cores = 2, verb = FA
 # Trimming the object to remove burn in and thin samples
 fit <- trim(fit, 50, 10)
 
-# Predition using the bhomGP_vec object with Vecchia (indepedent predictions)
+# Prediction using the bhomGP_vec object with Vecchia (independent predictions)
 fit <- predict(fit, xx, vecchia = TRUE, cores = 2)
 
 # Visualizing the mean predictive surface.

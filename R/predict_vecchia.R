@@ -60,10 +60,12 @@ predict_vec <- function(object, x_new, m = object$m, settings) {
                      sep = settings$sep, v = settings$v, m = object$m_pred)
 
       mean_lam[, t] <- plam$mean
+      
+      llam_draw <- plam$mean + qnorm(settings$qlam) * sqrt(plam$s2)
+      # llam_draw <- ifel(is.null(settings$qlam), plam$mean, plam$mean + qnorm(settings$qlam) * sqrt(plam$s2))
         
       py <- gp_vec_y(object$y, x_approx, x_new, lam = exp(object$llam_samples[t, ]), 
-                     lam_new = ifel(settings$ub, exp(plam$mean + qnorm(0.95) * plam$s2),exp(plam$mean)),
-                     theta = object$theta_y[t, ], tau2 =object$tau2[t], A = object$A,
+                     lam_new = exp(llam_draw), theta = object$theta_y[t, ], tau2 =object$tau2[t], A = object$A,
                      mu_y = settings$mean_y, lite = settings$lite, NNarray_pred = NN_x_new,
                      sep = settings$sep, v = settings$v, m = object$m_pred)
       
@@ -145,10 +147,12 @@ predict_vec <- function(object, x_new, m = object$m, settings) {
 
         out$mean_lam[, j] <- plam$mean
 
+        # llam_draw <- ifel(is.null(settings$qlam), plam$mean, plam$mean + qnorm(settings$qlam) * sqrt(plam$s2))
+        llam_draw <- plam$mean + qnorm(settings$qlam) * sqrt(plam$s2)
+        
         # can use llam_draw[, j] but will take time.
         py <- gp_vec_y(object$y, x_approx, x_new, lam = exp(object$llam_samples[t, ]), 
-                       lam_new = ifel(settings$ub, exp(plam$mean + qnorm(0.95) * plam$s2),exp(plam$mean)), # exp(out$mean_lam[, j]),
-                       theta = object$theta_y[t, ], tau2 =object$tau2[t], A = object$A,
+                       lam_new = exp(llam_draw), theta = object$theta_y[t, ], tau2 =object$tau2[t], A = object$A,
                        mu_y = settings$mean_y, lite = settings$lite, NNarray_pred = NN_x_new,
                        sep = settings$sep, v = settings$v, m = object$m_pred)
 
@@ -237,6 +241,7 @@ predict_vec <- function(object, x_new, m = object$m, settings) {
       object$s2_lnugs_ci <- s2_sum_lam_ci / object$nmcmc + apply(mean_lam, 1, var)
       object$s2_y_ci <- s2_sum_y_ci / object$nmcmc + apply(mean_y, 1, var)
     }
+    
     if (settings$return_all) {
       object$mean_lnugs_all <- mean_lam
       object$mean_all <- mean_y
@@ -290,6 +295,8 @@ predict_vec_vdims <- function(object, x_new, m = object$m, settings, mapping = o
     xv_new <- reps_vdims_new$X0
     Av_new <- reps_vdims_new$mult
     map_new <- reps_vdims_new$Z
+    
+    object$mappings$reps_vdims_new <- reps_vdims_new
   }else{
     xv <- object$xv
     xv_new <- x_new[, settings$vdims, drop = FALSE]
@@ -297,7 +304,7 @@ predict_vec_vdims <- function(object, x_new, m = object$m, settings, mapping = o
 
   nv_new <- nrow(xv_new)
 
-  if(nrow(xv) > 300) {
+  if(!is.null(object$xv_approx)) {
     vecchia_var <- TRUE
     if (settings$lite){
       NN_xv_new <- FNN::get.knnx(object$xv, xv_new, m)$nn.index
@@ -329,19 +336,41 @@ predict_vec_vdims <- function(object, x_new, m = object$m, settings, mapping = o
 
   if (settings$cores == 1) { # run serial for loop
 
-    mean_y <- matrix(nrow = n_new, ncol = object$nmcmc)
-    # yp_draw <- matrix(nrow = n_new, ncol = object$nmcmc)
-    if (settings$lite) {
-      s2_sum_y <- rep(0, times = n_new)
-      if (settings$return_all) s2_y <- matrix(nrow = n_new, ncol = object$nmcmc)
-    } else sigma_sum_y <- matrix(0, nrow = n_new, ncol = n_new)
+    mean_lam <- matrix(nrow = nv_new, ncol = object$nmcmc)
+    mean_y <- yp_draw <- matrix(nrow = n_new, ncol = object$nmcmc)
+    llam_draw <- matrix(nrow = nv_new, ncol = object$nmcmc)
+    mean_np_lam <- s2_np_lam <- yp_draw <- matrix(nrow = n_new, ncol = n_new)
     
-    mean_lam <- matrix(nrow = n_new, ncol = object$nmcmc)
-    llam_draw <- matrix(nrow = n_new, ncol = object$nmcmc)
+    
     if (settings$lite) {
-      s2_sum_lam <- rep(0, times = n_new)
-      if (settings$return_all) s2_lam <- matrix(nrow = n_new, ncol = object$nmcmc)
-    } else sigma_sum_lam <- matrix(0, nrow = n_new, ncol = n_new)
+      if(settings$interval == "pi" ||settings$interval == "both"){
+        s2_sum_y <- rep(0, times = n_new) 
+        s2_sum_lam <- rep(0, times = nv_new) 
+      }
+      if(settings$interval == "ci" ||settings$interval == "both"){
+        s2_sum_y_ci <- rep(0, times = n_new)
+        s2_sum_lam_ci <- rep(0, times = nv_new)
+      }
+      if (settings$return_all){
+        if(settings$interval == "pi" ||settings$interval == "both"){
+          s2_y <- matrix(nrow = n_new, ncol = object$nmcmc)
+          s2_lam <- matrix(nrow = nv_new, ncol = object$nmcmc)
+        }
+        if(settings$interval == "ci" ||settings$interval == "both"){
+          s2_y_ci <- matrix(nrow = n_new, ncol = object$nmcmc)
+          s2_lam_ci <- matrix(nrow = nv_new, ncol = object$nmcmc) 
+        }
+      } 
+    } else{
+      if(settings$interval == "pi" ||settings$interval == "both"){
+        sigma_sum_y <- matrix(0, nrow = n_new, ncol = n_new)
+        sigma_sum_lam <- matrix(0, nrow = nv_new, ncol = nv_new)
+      }
+      if(settings$interval == "ci" ||settings$interval == "both"){
+        sigma_sum_y_ci <- matrix(0, nrow = n_new, ncol = n_new) 
+        sigma_sum_lam_ci <- matrix(0, nrow = nv_new, ncol = nv_new) 
+      }
+    } 
 
     for (t in 1:object$nmcmc) {
 
@@ -358,37 +387,66 @@ predict_vec_vdims <- function(object, x_new, m = object$m, settings, mapping = o
       }
 
       if(!is.null(mapping$reps_vdims)){
+        # mean_np_lam <- plam$mean
+        # s2_np_lam <- plam$s2
         mean_np_lam[map_new] <- rep(plam$mean, Av_new)
         s2_np_lam[map_new] <- rep(plam$s2, Av_new)
-        llam_iter <- ifel(settings$ub, mean_np_lam + qnorm(0.95) * s2_np_lam, mean_np_lam)
+        # llam_draw <- ifel(is.null(settings$qlam), mean_np_lam, 
+        #                   mean_np_lam + qnorm(settings$qlam) * sqrt(s2_np_lam))
+        llam_draw <- mean_np_lam + qnorm(settings$qlam) * sqrt(s2_np_lam)
+        # llam_iter <- ifel(settings$ub, mean_np_lam + qnorm(0.95) * s2_np_lam, mean_np_lam)
+        llam_n <- rep(NA, sum(Av))
         llam_n[map] <- rep(object$llam_samples[t, ], Av)
 
       }else{
         mean_np_lam <- plam$mean
         s2_np_lam <- plam$s2
-        llam_iter <- ifel(settings$ub, plam$mean + qnorm(0.95) * plam$s2, plam$mean)
+        # llam_iter <- ifel(settings$ub, plam$mean + qnorm(0.95) * plam$s2, plam$mean)
+        # llam_draw <- ifel(is.null(settings$qlam), plam$mean , 
+        #                   plam$mean  + qnorm(settings$qlam) * sqrt(plam$s2))
+        llam_draw <- plam$mean  + qnorm(settings$qlam) * sqrt(plam$s2)
         llam_n <- object$llam_samples[t, ]
       }
 
       mean_lam[, t] <- plam$mean
 
-      if (settings$lite) {
-        s2_sum_lam <- s2_sum_lam + plam$s2
-        if (settings$return_all) s2_lam[, t] <- plam$s2
-      } else sigma_sum_lam <- sigma_sum_lam + plam$sigma
-
       py <- gp_vec_y(object$y, x_approx, x_new, lam = exp(llam_n), 
-                     lam_new = exp(llam_iter), # exp(llam_draw[, t]),
+                     lam_new = exp(llam_draw), # exp(llam_draw[, t]),
                      theta = object$theta_y[t, ], tau2 = object$tau2[t], lite = settings$lite,
                      NNarray_pred = NN_x_new, mu_y = settings$mean_y,
                      sep = settings$sep, v = settings$v, m = object$m_pred)
       
       mean_y[, t] <- py$mean
+
       if (settings$lite) {
-        s2_sum_y <- s2_sum_y + py$s2
-        if (settings$return_all) s2_y[, t] <- py$s2 # storing individual variances for each posterior sample
-      } else sigma_sum_y <- sigma_sum_y + py$sigma # storing main covariance matrix
-      
+        if(settings$interval == "pi" ||settings$interval == "both"){
+          s2_sum_lam <- s2_sum_lam + plam$s2
+          s2_sum_y <- s2_sum_y + py$s2
+        }
+        if(settings$interval == "ci" ||settings$interval == "both"){
+          s2_sum_lam_ci <- s2_sum_lam_ci + plam$s2_ci
+          s2_sum_y_ci <- s2_sum_y_ci + py$s2_ci
+        }
+        if (settings$return_all){
+          if(settings$interval == "pi" ||settings$interval == "both"){
+            s2_lam[, t] <- plam$s2
+            s2_y[, t] <- py$s2  
+          }
+          if(settings$interval == "ci" ||settings$interval == "both"){
+            s2_lam_ci[, t] <- plam$s2_ci
+            s2_y_ci[, t] <- py$s2_ci
+          }
+        } 
+      } else{
+        if(settings$interval == "pi" ||settings$interval == "both"){
+          sigma_sum_lam <- sigma_sum_lam + plam$sigma
+          sigma_sum_y <- sigma_sum_y + py$sigma # storing main covariance matrix 
+        }
+        if(settings$interval == "ci" ||settings$interval == "both"){
+          sigma_sum_lam_ci <- sigma_sum_lam_ci + plam$sigma_ci
+          sigma_sum_y_ci <- sigma_sum_y_ci + py$sigma_ci # storing main covariance matrix
+        }
+      } 
       # yp_draw[, t] <- mvtnorm::rmvnorm(1, mean = mean_y[, t], sigma = diag (py$s2))
     } # end of t for loop
 
@@ -408,20 +466,41 @@ predict_vec_vdims <- function(object, x_new, m = object$m, settings, mapping = o
     result <- foreach(thread = 1:settings$cores) %dopar% {
       out <- list()
       out$mean_y <- matrix(nrow = n_new, ncol = length(chunks[[thread]]))
-      out$mean_lam <- matrix(nrow = n_new, ncol = length(chunks[[thread]]))
+      out$mean_lam <- matrix(nrow = nv_new, ncol = length(chunks[[thread]]))
       if (settings$lite) {
-        out$s2_sum_y <- rep(0, times = n_new)
-        out$s2_sum_lam <- rep(0, times = n_new)
+        if(settings$interval == "pi" ||settings$interval == "both"){
+          out$s2_sum_y <- rep(0, times = nv_new)
+          out$s2_sum_lam <- rep(0, times = nv_new) 
+        }
+        if(settings$interval == "ci" ||settings$interval == "both"){
+          out$s2_sum_y_ci <- rep(0, times = nv_new)
+          out$s2_sum_lam_ci <- rep(0, times = nv_new)
+        }
         if (settings$return_all) {
-          out$s2_y <- matrix(nrow = n_new, ncol = length(chunks[[thread]]))
-          out$s2_lam <- matrix(nrow = n_new, ncol = length(chunks[[thread]]))
+          if(settings$interval == "pi" ||settings$interval == "both"){
+            out$s2_y <- matrix(nrow = n_new, ncol = length(chunks[[thread]]))
+            out$s2_lam <- matrix(nrow = nv_new, ncol = length(chunks[[thread]]))
+          }
+          if(settings$interval == "ci" ||settings$interval == "both"){
+            out$s2_y_ci <- matrix(nrow = n_new, ncol = length(chunks[[thread]]))
+            out$s2_lam_ci <- matrix(nrow = nv_new, ncol = length(chunks[[thread]]))
+          }
         }
       } else {
-        out$sigma_sum_y <- matrix(0, nrow = n_new, ncol = n_new)
-        out$sigma_sum_lam <- matrix(0, nrow = n_new, ncol = n_new)
+        if(settings$interval == "pi" ||settings$interval == "both"){
+          out$sigma_sum_y <- matrix(0, nrow = n_new, ncol = n_new)
+          out$sigma_sum_lam <- matrix(0, nrow = nv_new, ncol = nv_new)
+        }
+        if(settings$interval == "ci" ||settings$interval == "both"){
+          out$sigma_sum_y_ci <- matrix(0, nrow = n_new, ncol = n_new)
+          out$sigma_sum_lam_ci <- matrix(0, nrow = nv_new, ncol = nv_new) 
+        }
       }
-
-      # llam_draw <- yp_draw <- matrix(nrow = n_new, ncol = length(chunks[[thread]]))
+      
+      mean_np_lam <- s2_np_lam <- yp_draw <- matrix(nrow = n_new, ncol = length(chunks[[thread]]))
+      # llam_draw <- matrix(nrow = nv_new, ncol = length(chunks[[thread]]))
+      # mean_lam <- mean_y <- matrix(nrow = n_new, ncol = length(chunks[[thread]]))
+      
       j <- 1
       for (t in chunks[[thread]]) {
         
@@ -440,38 +519,67 @@ predict_vec_vdims <- function(object, x_new, m = object$m, settings, mapping = o
         if(!is.null(mapping$reps_vdims)){
           mean_np_lam[map_new] <- rep(plam$mean, Av_new)
           s2_np_lam[map_new] <- rep(plam$s2, Av_new)
-          llam_iter <- ifel(settings$ub, mean_np_lam + qnorm(0.95) * s2_np_lam, mean_np_lam)
+          # llam_draw <- ifel(is.null(settings$qlam), mean_np_lam, 
+          #                   mean_np_lam + qnorm(settings$qlam) * sqrt(s2_np_lam))
+          llam_draw <- mean_np_lam + qnorm(settings$qlam) * sqrt(s2_np_lam)
+          # llam_iter <- ifel(settings$ub, mean_np_lam + qnorm(0.95) * s2_np_lam, mean_np_lam)
+          llam_n <- rep(NA, sum(Av))
           llam_n[map] <- rep(object$llam_samples[t, ], Av)
           
         }else{
           mean_np_lam <- plam$mean
           s2_np_lam <- plam$s2
-          llam_iter <- ifel(settings$ub, plam$mean + qnorm(0.95) * plam$s2, plam$mean)
+          # llam_draw <- ifel(is.null(settings$qlam), plam$mean , 
+          #                   plam$mean  + qnorm(settings$qlam) * sqrt(plam$s2))
+          llam_draw <- plam$mean  + qnorm(settings$qlam) * sqrt(plam$s2)
           llam_n <- object$llam_samples[t, ]
         }
         
-        mean_lam[, j] <- plam$mean
-        
-        if (settings$lite) {
-          s2_sum_lam <- s2_sum_lam + plam$s2
-          if (settings$return_all) s2_lam[, j] <- plam$s2
-        } else sigma_sum_lam <- sigma_sum_lam + plam$sigma
+        # mean_lam[, j] <- 
+        out$mean_lam[, j] <- plam$mean
         
         py <- gp_vec_y(object$y, x_approx, x_new, lam = exp(llam_n), 
-                       lam_new = exp(llam_iter), # exp(llam_draw[, t]),
+                       lam_new = exp(llam_draw), # exp(llam_draw[, t]),
                        theta = object$theta_y[t, ], tau2 = object$tau2[t], lite = settings$lite,
                        NNarray_pred = NN_x_new, mu_y = settings$mean_y,
                        sep = settings$sep, v = settings$v, m = object$m_pred)
         
-        mean_y[, j] <- py$mean
-        if (settings$lite) {
-          s2_sum_y <- s2_sum_y + py$s2
-          if (settings$return_all) s2_y[, j] <- py$s2 # storing individual variances for each posterior sample
-        } else sigma_sum_y <- sigma_sum_y + py$sigma # storing main covariance matrix
-        
+        # mean_y[, j] <- py$mean
+        out$mean_y[, j] <- py$mean
+
         j <- j + 1
+        if (settings$lite) {
+          if(settings$interval == "pi" ||settings$interval == "both"){
+            out$s2_sum_lam <- out$s2_sum_lam + plam$s2
+            out$s2_sum_y <- out$s2_sum_y + py$s2
+          }
+          if(settings$interval == "ci" ||settings$interval == "both"){
+            out$s2_sum_lam_ci <- out$s2_sum_lam_ci + plam$s2_ci
+            out$s2_sum_y_ci <- out$s2_sum_y_ci + py$s2_ci
+          }
+          if (settings$return_all){
+            if(settings$interval == "pi" ||settings$interval == "both"){
+              out$s2_lam[, j] <- plam$s2
+              out$s2_y[, j] <- py$s2  
+            }
+            if(settings$interval == "ci" ||settings$interval == "both"){
+              out$s2_lam_ci[, j] <- plam$s2_ci
+              out$s2_y_ci[, j] <- py$s2_ci
+            }
+          } 
+        } else{
+          if(settings$interval == "pi" ||settings$interval == "both"){
+            out$sigma_sum_lam <- out$sigma_sum_lam + plam$sigma
+            out$sigma_sum_y <- out$sigma_sum_y + py$sigma # storing main covariance matrix 
+          }
+          if(settings$interval == "ci" ||settings$interval == "both"){
+            out$sigma_sum_lam_ci <- out$sigma_sum_lam + plam$sigma_ci
+            out$sigma_sum_y_ci <- out$sigma_sum_y + py$sigma_ci # storing main covariance matrix
+          }
+        } 
         # yp_draw[, t] <- mvtnorm::rmvnorm(1, mean = mean_y[, t], sigma = diag (py$s2))
       } # end of t for loop
+      return(out)
     } # end of foreach loop
 
     stopCluster(cl)
@@ -495,26 +603,42 @@ predict_vec_vdims <- function(object, x_new, m = object$m, settings, mapping = o
 
   # Add variables to the output list
   object$mean <- rowMeans(mean_y)
-  if (settings$lite) {
-    object$s2_y <- s2_sum_y / object$nmcmc + apply(mean_y, 1, var)
-    if (settings$return_all) {
-      object$mean_all <- mean_y
-      object$s2_all <- s2_y
-    }
-  } else object$Sigma <- sigma_sum_y / object$nmcmc + cov(t(mean_y))
-  
   object$mean_lnugs <- rowMeans(mean_lam)
   if (settings$lite) {
-    object$s2_lnugs <- s2_sum_lam / object$nmcmc + apply(mean_lam, 1, var)
-    if (settings$return_all) {
-      object$mean_lnugs_all <- mean_lam
-      object$s2_lnugs_all <- s2_lam
+    if(settings$interval == "pi" ||settings$interval == "both"){
+      object$s2_y <- s2_sum_y / object$nmcmc + apply(mean_y, 1, var)
+      object$s2_lnugs <- s2_sum_lam / object$nmcmc + apply(mean_lam, 1, var) 
     }
-  } else object$Sigma_nugs <- sigma_sum_lam / object$nmcmc + cov(t(mean_lam))
-
+    if(settings$interval == "ci" ||settings$interval == "both"){
+      object$s2_y_ci <- s2_sum_y_ci / object$nmcmc + apply(mean_y, 1, var)
+      object$s2_lnugs_ci <- s2_sum_lam_ci / object$nmcmc + apply(mean_lam, 1, var)
+    }
+    if (settings$return_all) {
+      object$mean_all <- mean_y
+      object$mean_lnugs_all <- mean_lam
+      if(settings$interval == "pi" ||settings$interval == "both"){
+        object$s2_all <- s2_y
+        object$s2_lnugs_all <- s2_lam
+      }
+      if(settings$interval == "ci" ||settings$interval == "both"){
+        object$s2_all_ci <- s2_y_ci
+        object$s2_lnugs_all_ci <- s2_lam_ci
+      }
+    }
+  } else {
+    if(settings$interval == "pi" ||settings$interval == "both"){
+      object$Sigma <- sigma_sum_y / object$nmcmc + cov(t(mean_y))
+      object$Sigma_nugs <- sigma_sum_lam / object$nmcmc + cov(t(mean_lam)) 
+    }
+    if(settings$interval == "ci" ||settings$interval == "both"){
+      object$Sigma_ci <- sigma_sum_y_ci / object$nmcmc + cov(t(mean_y))
+      object$Sigma_nugs_ci <- sigma_sum_lam_ci / object$nmcmc + cov(t(mean_lam))
+    }
+  }
+  
   toc <- proc.time()[[3]]
   object$time <- object$time + unname(toc - tic)
-
+  
   return(object)
 }
 
@@ -782,7 +906,6 @@ gp_vec_y <- function(out_vec, x_approx = NULL, x_new, A = NULL, lam = 1e-5,
   lam_vec <- c(lam, lam_new)
 
   if(!lite){
-    # stop("check here")
     lam_vec <- lam_vec[x_approx$ord]
 
     out_vec_o <- out_vec[x_approx$ord[x_approx$observed]] - mu_y# tells you which are obs
@@ -835,7 +958,6 @@ gp_vec_y <- function(out_vec, x_approx = NULL, x_new, A = NULL, lam = 1e-5,
       s2[i] <- tau2 * (L[m + 1, m + 1] ^ 2)
       s2_ci[i] <- s2[i] -  (tau2 *  lam_new[i])
     }
-    # stop("why is this inflated")
     return(list(mean = mean, s2 = s2, sigma = NULL, s2_ci = s2_ci))
   }
 }

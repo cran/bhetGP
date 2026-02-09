@@ -103,7 +103,9 @@ gibbs_sep_vdims_N <- function(Yn, xm, mcmc, initial, priors, v, vdims = NULL, ve
                               sep = TRUE, v = v, outer = initial$outer, calc_tau2 = initial$tau2, 
                               dx_n = NULL, dx_v = NULL, mean = initial$mean_y, scale = initial$scale_y, 
                               a = priors$a$tau2_y, b = priors$b$tau2_y,
-                              mean0 = initial$mean_lam, scale0 = tau2_lam, g0 = g[t])
+                              mean0 = initial$mean_lam, 
+                              scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam),
+                              g0 = g[t])
     
     llam_N[t, ] <- llam_draw$llam
     llik_y <- llam_draw$llik
@@ -118,7 +120,7 @@ gibbs_sep_vdims_N <- function(Yn, xm, mcmc, initial, priors, v, vdims = NULL, ve
     llik_y_store[t] <- llik_y
     llik_lam_store[t] <- llik_lam
     
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)     
     tau2_store[t] <- tau2
   }
   
@@ -210,7 +212,9 @@ gibbs_iso_vdims_N <- function(Yn, xm, mcmc, initial, priors, v, vdims = NULL, ve
                               theta_lam = theta_lam[t, ], sep = FALSE, v = v, outer = initial$outer, 
                               calc_tau2 = initial$tau2, a = priors$a$tau2_y, b = priors$b$tau2_y,
                               dx_n = dxm, dx_v = dxv, mean = initial$mean_y, scale = initial$scale_y, 
-                              mean0 = initial$mean_lam, scale0 = tau2_lam, g0 = g[t])
+                              mean0 = initial$mean_lam, 
+                              scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam),
+                              g0 = g[t])
     
     llam_N[t, ] <- llam_draw$llam
     llik_y <- llam_draw$llik
@@ -225,7 +229,7 @@ gibbs_iso_vdims_N <- function(Yn, xm, mcmc, initial, priors, v, vdims = NULL, ve
     llik_y_store[t] <- llik_y
     llik_lam_store[t] <- llik_lam
     
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)     
     tau2_store[t] <- tau2
   }
   
@@ -375,7 +379,9 @@ gibbs_sep_vdims_N_vec <- function(Yn, xm_approx, mcmc, initial, priors, v, vdims
                                   llik_prev = llik_y, theta_y = theta_y[t, ], theta_lam = theta_lam[t, ], 
                                   sep = TRUE, v = v, outer = TRUE, calc_tau2 = TRUE,
                                   mean = initial$mean_y, scale = initial$scale_y, 
-                                  mean0 = initial$mean_lam, scale0 = tau2_lam, g0 = g[t],
+                                  mean0 = initial$mean_lam, 
+                                  scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam),
+                                  g0 = g[t],
                                   a = priors$a$tau2_y, b = priors$b$tau2_y)
     
     llam_N[t, ] <- llam_draw$llam # lambdas that map to Xn's
@@ -393,7 +399,7 @@ gibbs_sep_vdims_N_vec <- function(Yn, xm_approx, mcmc, initial, priors, v, vdims
     llik_y_store[t] <- llik_y
     llik_lam_store[t] <- llik_lam
     
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)     
     tau2_store[t] <- tau2
   }
   
@@ -486,7 +492,8 @@ gibbs_iso_vdims_N_vec <- function(Yn, xm_approx, mcmc, initial, priors, v, vdims
                                   llik_prev = llik_y, theta_y = theta_y[t], theta_lam = theta_lam[t], 
                                   sep = FALSE, v= v, outer = initial$outer, calc_tau2 = initial$tau2,
                                   mean = initial$mean_y, scale = initial$scale_y, a = priors$a$tau2_y, 
-                                  b = priors$b$tau2_y, mean0 = initial$mean_lam, scale0 = tau2_lam, 
+                                  b = priors$b$tau2_y, mean0 = initial$mean_lam, 
+                                  scale0 = ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam),
                                   g0 = g[t], dxv = NULL)
     
     llam_N[t, ] <- llam_draw$llam
@@ -502,7 +509,7 @@ gibbs_iso_vdims_N_vec <- function(Yn, xm_approx, mcmc, initial, priors, v, vdims
     llik_y_store[t] <- llik_y
     llik_lam_store[t] <- llik_lam
     
-    tau2_lam_store[t] <- tau2_lam
+    tau2_lam_store[t] <- ifel(initial$prof_ll_lam, tau2_lam, initial$scale_lam)     
     tau2_store[t] <- tau2
   }
   return(list(theta_lam = theta_lam, theta_y = theta_y, llam_samples = llam_N, tau2 = tau2_store, 

@@ -21,7 +21,7 @@
 #' 
 #' @rdname trim
 #' @export
-trim <- function(object, burn, thin){
+trim <- function(object, burn = 500, thin = 10){
   
   tic <- proc.time()[3]
   if (burn >= object$nmcmc) stop('burn must be less than nmcmc')

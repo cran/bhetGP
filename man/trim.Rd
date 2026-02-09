@@ -4,7 +4,7 @@
 \alias{trim}
 \title{Trim/Thin MCMC iterations}
 \usage{
-trim(object, burn, thin)
+trim(object, burn = 500, thin = 10)
 }
 \arguments{
 \item{object}{object from \code{bhetGP}, or \code{bhomGP}}

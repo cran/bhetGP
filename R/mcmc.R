@@ -319,7 +319,6 @@ ess_sample_vdims <- function(YNs2=NULL, yn, xn, vdims, llam_prev_nv, A, llik_pre
                                  calc_tau2 = calc_tau2, mean = mean, scale = scale, a = a, b = b)$llik
     }
   }
-  warning("check if llik match")
   
   # Extract unique nv X's
   xv <- r0$X0

@@ -68,15 +68,41 @@ ifel <- function(logical, yes, no) {
   } else return(no)
 }
 
-## Mappings - use with vdims
+score <- function(ytrue, mu, s2, mult = 1){
+  
+  mF <- rep(mu, mult)
+  s2F <- rep(s2, mult)
+  seF <- (ytrue - mF)^2
+  sc <- - seF/s2F - log(s2F)
+  score <- mean(sc)
+  
+  return(score)
+}
 
-# map <- function(reps_vdims, y){
-#   map <- list()
-#   map$xv <- reps_vdims$X0
-#   map$yv <- sapply(reps_vdims$Zlist, function(i) mean(y[i]))
-#   map$yvs2 <- sapply(reps_vdims$Zlist, function(i) sum((y[i] - mean(y[i]))^2))
-#   map$orderF <- reps_vdims$Z
-#   map$multF <- reps_vdims$mult
-#   return(map)
-# }
+rmse <- function(ytrue, mu, mult = 1){
+  mF <- rep(mu, mult)
+  seF <- (ytrue - mF)^2
+  rmse <- sqrt(mean(seF))
+  
+  return(rmse)
+}
+
+# Noise simulator
+
+rn <- function(Xlam, mean = 0, theta.lam = 0.2, tau2.lam = 1, 
+               px = c(0.2, 0.8), py = c(-2, 2)){
+  
+  if(!is.matrix(Xlam)) Xlam <- as.matrix(Xlam)
+  px <- matrix(px, ncol = 1)
+  
+  condMu <- Exp2Sep(x1= Xlam ,x2= px, 1, theta =theta.lam, 1e-8) %*%
+    solve(Exp2Sep(x1 = px, x2 = px, tau2 = 1, theta =theta.lam, g = 1e-8)) %*% py
+  
+  condSig <- Exp2Sep(x1=Xlam, x2 = Xlam, tau2 = 1, theta =theta.lam, g = 1e-8) -
+    Exp2Sep(x1 = Xlam, x2= px, tau2 = 1, theta =theta.lam, g = 1e-8) %*%
+    solve(Exp2Sep(x1=px, x2 = px, tau2 = 1, theta =theta.lam, g = 1e-8)) %*%
+    Exp2Sep(x1 = px, x2 = Xlam, tau2 = 1, theta =theta.lam, g = 1e-8)
+  
+  llam <- sqrt(tau2.lam) * (drop(rmvnorm(1, mean = condMu, sigma= condSig)) + mean)
+}
 
